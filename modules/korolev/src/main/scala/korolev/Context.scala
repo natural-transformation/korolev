@@ -104,12 +104,18 @@ object Context {
                                                                                    (implicit _e: Effect[F],
                                                                                     _css: StateSerializer[S],
                                                                                     _csd: StateDeserializer[S]) {
-      def apply(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
-        ComponentEntry(component, parameters, (_, _) => Effect[F].unit)
+
+      final class ComponentEntryWithEventHandlerDsl(p: P) extends ComponentEntry[F, S, M, CS, P, E](component, p, (_, _) => Effect[F].unit)  {
+        def apply(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
+          copy(eventHandler = (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e))
+      }
+
+      def apply(parameters: P): ComponentEntryWithEventHandlerDsl =
+        new ComponentEntryWithEventHandlerDsl(parameters)
 
       @deprecated("Just apply", "1.16.0")
       def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
-        apply(parameters)
+        ComponentEntry(component, parameters, (_, _) => Effect[F].unit)
     }
   }
 
@@ -404,7 +410,7 @@ object Context {
 
   final case class FileHandler(fileName: String, size: Long)(private[korolev] val elementId: ElementId)
 
-  final case class ComponentEntry
+  sealed case class ComponentEntry
     [
       F[_]: Effect,
       AS: StateSerializer: StateDeserializer, M,
@@ -442,12 +448,6 @@ object Context {
         scheduler, reporter, recovery
       )
     }
-
-    //
-    // (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e)
-
-    def apply(f: (Access[F, AS, M], E) => F[Unit]): ComponentEntry[F, AS, M, CS, P, E] =
-      copy(eventHandler = f)
   }
 
   final case class Event[F[_], S, M](

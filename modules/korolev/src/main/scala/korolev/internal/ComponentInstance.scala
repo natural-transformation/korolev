@@ -74,6 +74,7 @@ final class ComponentInstance[
 
   private val miscLock = new Object()
 
+  private var lastParameters: P = _
   private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
   private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
@@ -229,13 +230,15 @@ final class ComponentInstance[
     val state = snapshot[CS](nodeId).map(Right(_)).getOrElse(component.initialState)
     val node = state match {
       case Right(value) =>
-        component.maybeUpdateState(parameters, value) match {
-          case None => ()
-          case Some(effect) =>
-            effect.flatMap { newState =>
-              stateManager.write(nodeId, newState) *>
-                stateQueue.enqueue(nodeId, newState, None)
-            }.runAsyncForget // TODO Should be cancelable
+        if (lastParameters != parameters) {
+          component.maybeUpdateState(parameters, value) match {
+            case None => ()
+            case Some(effect) =>
+              effect.flatMap { newState =>
+                stateManager.write(nodeId, newState) *>
+                  stateQueue.enqueue(nodeId, newState, None)
+              }.runAsyncForget // TODO Should be cancelable
+          }
         }
         component.render(parameters, value)
       case Left(generateState) =>
@@ -246,6 +249,7 @@ final class ComponentInstance[
         component.renderNoState(parameters)
     }
 
+    lastParameters = parameters
     val proxy = createMiscProxy(
       rc, { (proxy, misc) =>
         misc match {
