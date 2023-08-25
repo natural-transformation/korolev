@@ -104,11 +104,12 @@ object Context {
                                                                                    (implicit _e: Effect[F],
                                                                                     _css: StateSerializer[S],
                                                                                     _csd: StateDeserializer[S]) {
-      def apply(parameters: P)(f: (Access, E) => F[Unit]): ComponentEntry[F, S, M, CS, P, E] =
-        ComponentEntry(component, parameters, (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e))
-
-      def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
+      def apply(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
         ComponentEntry(component, parameters, (_, _) => Effect[F].unit)
+
+      @deprecated("Just apply", "1.16.0")
+      def silent(parameters: P): ComponentEntry[F, S, M, CS, P, E] =
+        apply(parameters)
     }
   }
 
@@ -441,6 +442,12 @@ object Context {
         scheduler, reporter, recovery
       )
     }
+
+    //
+    // (a: Context.Access[F, S, M], e: E) => f(accessScope(a), e)
+
+    def apply(f: (Access[F, AS, M], E) => F[Unit]): ComponentEntry[F, AS, M, CS, P, E] =
+      copy(eventHandler = f)
   }
 
   final case class Event[F[_], S, M](

@@ -228,12 +228,21 @@ final class ComponentInstance[
     prepare()
     val state = snapshot[CS](nodeId).map(Right(_)).getOrElse(component.initialState)
     val node = state match {
-      case Right(value) => component.render(parameters, value)
+      case Right(value) =>
+        component.maybeUpdateState(parameters, value) match {
+          case None => ()
+          case Some(effect) =>
+            effect.flatMap { newState =>
+              stateManager.write(nodeId, newState) *>
+                stateQueue.enqueue(nodeId, newState, None)
+            }.runAsyncForget // TODO Should be cancelable
+        }
+        component.render(parameters, value)
       case Left(generateState) =>
         generateState(parameters).flatMap { newState =>
           stateManager.write(nodeId, newState) *>
             stateQueue.enqueue(nodeId, newState, None)
-        }.runAsyncForget
+        }.runAsyncForget  // TODO Should be cancelable
         component.renderNoState(parameters)
     }
 

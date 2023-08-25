@@ -68,12 +68,21 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
     }
   }
 
+  def wait1sConvertIntToString(params: Int) = {
+    Scheduler[Future].sleep(1000.millis).as(params.toString)
+  }
+
   object ComponentWithStateLoader extends Component[Future, String, Int, Any](
-    loadState = (params: Int) =>
-      Scheduler[Future].sleep(1000.millis).as(params.toString)
+    loadState = wait1sConvertIntToString
   ) {
     def render(parameters: Int, state: String): context.Node = {
       div(s"Render with state, State is ${state}")
+    }
+
+    override def maybeUpdateState(parameters: Int, currentState: String): Option[Future[String]] = {
+      if (parameters.toString != currentState)
+        Some(wait1sConvertIntToString(parameters))
+      else None
     }
 
     override def renderNoState(parameters: Int): context.Node = {
@@ -94,7 +103,7 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
             ComponentAsFunction("Click me, i'm object") { (access, _) =>
               access.transition(_ + Random.nextPrintableChar())
             },
-            ComponentWithStateLoader.silent(42),
+            ComponentWithStateLoader(Random.nextInt(3)),
             button(
               "Click me too",
               event("click") { access =>

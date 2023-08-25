@@ -64,6 +64,8 @@ abstract class Component[
 
   def renderNoState(parameters: P): context.Node =
     levsha.dsl.html.div()
+
+  def maybeUpdateState(parameters: P, currentState: S): Option[F[S]] = None
 }
 
 object Component {
