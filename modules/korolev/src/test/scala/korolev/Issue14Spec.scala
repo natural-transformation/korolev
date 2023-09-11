@@ -22,7 +22,7 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
     var counter = 0
 
     val incomingMessages = Queue[Future, String]()
-    val frontend = new Frontend[Future](incomingMessages.stream)
+    val frontend = new Frontend[Future](incomingMessages.stream, None)
     val app = new ApplicationInstance[Future, Issue14Spec.S, Any](
       sessionId = Qsid("", ""),
       frontend = frontend,

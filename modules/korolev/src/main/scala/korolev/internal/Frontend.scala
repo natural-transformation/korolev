@@ -33,7 +33,7 @@ import scala.concurrent.ExecutionContext
 /**
   * Typed interface to client side
   */
-final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit reporter: Reporter,
+final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbeatLimit: Option[Int])(implicit reporter: Reporter,
                                                                         ec: ExecutionContext) {
 
   import Frontend._
@@ -270,7 +270,12 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String])(implicit
 
   rawClientMessages.foreach {
     case (CallbackType.Heartbeat.code, _) =>
-      Effect[F].unit
+      heartbeatLimit match {
+        case Some(_) =>
+          sendRaw("[16]")
+        case None =>
+          Effect[F].unit
+      }
     case (CallbackType.ExtractPropertyResponse.code, args) =>
       val Array(descriptor, propertyType, value) = args.split(":", 3)
       propertyType.toInt match {
@@ -336,6 +341,7 @@ object Frontend {
     case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
     case object RestForm extends Procedure(14) // (id)
     case object DownloadFile extends Procedure(15) // (descriptor, fileName)
+    case object Heartbeat extends Procedure(16) // (descriptor, fileName)
 
     val All = Set(
       SetRenderNum,
@@ -353,7 +359,8 @@ object Frontend {
       ListFiles,
       UploadFile,
       RestForm,
-      DownloadFile
+      DownloadFile,
+      Heartbeat
     )
 
     def apply(n: Int): Option[Procedure] =
