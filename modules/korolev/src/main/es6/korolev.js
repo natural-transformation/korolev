@@ -89,7 +89,7 @@ export class Korolev {
     window.removeEventListener('popstate', this.historyHandler);
     window.removeEventListener('resize', this.windowHandler);
   }
-  
+
   /** @param {number} n */
   setRenderNum(n) {
     // Remove obsolete event data
@@ -104,12 +104,24 @@ export class Korolev {
       var children = node.childNodes;
       for (var i = 0; i < children.length; i++) {
         var child = children[i];
-        var id = prefix + '_' + (i + 1);
+        var id
+
+        if(self.config['kid']) {
+          if(child.getAttribute && child.getAttribute('k')) {
+            id = prefix + '_' + child.getAttribute('k');
+          }else {
+            id = prefix + '_' + '1';
+          }
+        } else {
+          id = prefix + '_' + (i + 1);
+        }
+
         child.vId = id;
         self.els[id] = child;
         aux(id, child);
       }
     }
+
     self.root = rootNode;
     self.els["1"] = rootNode;
     aux("1", rootNode);
@@ -143,7 +155,7 @@ export class Korolev {
       }
     }
   }
-  
+
    /**
     * @param {string} id
     * @param {string} childId
@@ -160,6 +172,10 @@ export class Korolev {
       newElement = document.createElementNS(xmlNs, tag);
     }
     newElement.vId = childId;
+    if(this.config['kid']) {
+      var ids = childId.split('_')
+      newElement.setAttribute('k', ids[ids.length - 1]);
+    }
     if (child && child.parentNode === parent) {
       parent.replaceChild(newElement, child);
     } else {
