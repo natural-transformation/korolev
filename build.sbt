@@ -1,8 +1,7 @@
 import xerial.sbt.Sonatype._
 
-val scala2_12Version = "2.12.15"
-val scala2_13Version = "2.13.8"
-val scala3Version = "3.2.2"
+val scala2_13Version = "2.13.12"
+val scala3Version = "3.3.1"
 
 val levshaVersion = "1.3.0"
 
@@ -27,7 +26,7 @@ scalaVersion := scala2_13Version
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq(scala2_12Version, scala2_13Version, scala3Version)
+  crossScalaVersions := Seq(scala2_13Version, scala3Version)
 )
 
 val dontPublishSettings = Seq(
