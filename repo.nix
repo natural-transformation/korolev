@@ -2,7 +2,7 @@
 {
   "versioning" = [{
       "scalaVersion" = "2.13.12";
-      "sbtVersion" = "1.9.4";
+      "sbtVersion" = "1.9.5";
     }];
   "repos" = {
     "nix-public" = "";
@@ -2528,33 +2528,17 @@
       url = "https://repo1.maven.org/maven2/org/scala-lang/scala-reflect/2.13.4/scala-reflect-2.13.4.pom";
       sha256 = "35B886E67492B22A697032084770F99954ADB14A331072AFBAC0D4B835EE6113";
     };
-    "nix-public/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3-javadoc.jar";
-      sha256 = "66D608270D019A0C7FB276AD13989DBFA94D87F629D73D722D46DA036565A33B";
+    "nix-public/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12-javadoc.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12-javadoc.jar";
+      sha256 = "9D4A241D905EA81676CF84871F4EF96676E4D1C28DF7B45EDB2BC37383CF2196";
     };
-    "nix-public/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3-sources.jar";
-      sha256 = "4E7414D70E3567ACF78002FA99FC9BF3EF3E68543C481D8A7B292F7BC9D0F542";
+    "nix-public/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12-sources.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12-sources.jar";
+      sha256 = "8E80D0F0A6FB55948C7E2979F5DC5F80929B0C36BA1F7AF8C99F9A978342CFB7";
     };
-    "nix-public/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3.pom" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-bridge_2.13/1.9.3/compiler-bridge_2.13-1.9.3.pom";
-      sha256 = "02D870330509B8C293FBC65516EADD7E3CC23D331F2FDA0E9ACF548F49621DBD";
-    };
-    "nix-public/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3-javadoc.jar";
-      sha256 = "7A3D3AC6AC9953D88C9606980FB63A3EE179A30D1BCD99A74A2385D5F2FC5F3A";
-    };
-    "nix-public/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3-sources.jar";
-      sha256 = "22200C6BE450EA4651088F1D43670D14EE7808AA0C1B07A1FF6BC1104A3D7488";
-    };
-    "nix-public/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3.jar";
-      sha256 = "FA586B4B1BDB61C48821CF9568507C1E4D57DE3763D27AC2214523B00A173115";
-    };
-    "nix-public/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3.pom" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/compiler-interface/1.9.3/compiler-interface-1.9.3.pom";
-      sha256 = "C95F6D77831784A289934219247392977BCB52CC6080B8B2AD3064A37030ED7E";
+    "nix-public/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12.pom" = {
+      url = "https://repo1.maven.org/maven2/org/scala-lang/scala2-sbt-bridge/2.13.12/scala2-sbt-bridge-2.13.12.pom";
+      sha256 = "5B5FC9AF9C6C92E1B4C828AA6C3F43C844ED535382CD777A1EBBD3C46B022AC8";
     };
     "nix-public/org/scala-sbt/test-interface/1.0/test-interface-1.0-javadoc.jar" = {
       url = "https://repo1.maven.org/maven2/org/scala-sbt/test-interface/1.0/test-interface-1.0-javadoc.jar";
@@ -2571,22 +2555,6 @@
     "nix-public/org/scala-sbt/test-interface/1.0/test-interface-1.0.pom" = {
       url = "https://repo1.maven.org/maven2/org/scala-sbt/test-interface/1.0/test-interface-1.0.pom";
       sha256 = "61BA06A9D0C226E10F048004FCEBFB300FDD9B077D05ED502E9875324C8B762E";
-    };
-    "nix-public/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2-javadoc.jar";
-      sha256 = "73B8B6FB80CF3718C77A121F7741C7C3A3E0CF6B7A37BBF2C13F9F981B6C5C12";
-    };
-    "nix-public/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2-sources.jar";
-      sha256 = "BED4331C842F3C8B1C198EC25EAD990FD064E1A0672AE2856AAFC2A7593EC1FE";
-    };
-    "nix-public/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2.jar" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2.jar";
-      sha256 = "CBF6C0DB09223E4C6C41AFC4C5D831C47E3564E83361DF4BA3CB04E439F83675";
-    };
-    "nix-public/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2.pom" = {
-      url = "https://repo1.maven.org/maven2/org/scala-sbt/util-interface/1.9.2/util-interface-1.9.2.pom";
-      sha256 = "1D60A8D396AD4312A7CD76174B31FBE018959603E6500D5805D0BFDF9CAD5F96";
     };
     "nix-public/org/scalacheck/scalacheck_2.13/1.15.4/scalacheck_2.13-1.15.4-javadoc.jar" = {
       url = "https://repo1.maven.org/maven2/org/scalacheck/scalacheck_2.13/1.15.4/scalacheck_2.13-1.15.4-javadoc.jar";
