@@ -32,8 +32,7 @@ import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-final class ApplicationInstance
-  [
+final class ApplicationInstance[
     F[_]: Effect,
     S: StateSerializer: StateDeserializer,
     M

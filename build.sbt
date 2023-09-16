@@ -96,7 +96,7 @@ val commonSettings = publishSettings ++ Seq(
 )
 
 val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
-  libraryDependencies += "org.slf4j" % "slf4j-simple" % "1.7.+"
+  libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.9"
 )
 
 val modules = file("modules")
@@ -517,8 +517,8 @@ lazy val `integration-tests` = project
   .settings(
     run / fork := true,
     libraryDependencies ++= Seq(
-      "org.slf4j" % "slf4j-simple" % "1.7.+",
-      "org.seleniumhq.selenium" % "selenium-java" % "2.53.1",
+      "org.slf4j" % "slf4j-simple" % "2.0.9",
+      "org.seleniumhq.selenium" % "selenium-java" % "4.12.1",
       "io.circe" %% "circe-core" % circeVersion,
       "io.circe" %% "circe-generic" % circeVersion,
       "io.circe" %% "circe-parser" % circeVersion

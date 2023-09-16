@@ -403,8 +403,7 @@ object Context {
 
   final case class FileHandler(fileName: String, size: Long)(private[korolev] val elementId: ElementId)
 
-  final case class ComponentEntry
-    [
+  final case class ComponentEntry[
       F[_]: Effect,
       AS: StateSerializer: StateDeserializer, M,
       CS: StateSerializer: StateDeserializer, P, E
