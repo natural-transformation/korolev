@@ -21,7 +21,7 @@ val fs2ce3Version = "3.2.8"
 val monixVersion = "3.4.1"
 val scodecVersion = "1.1.34"
 
-scalaVersion := scala2_13Version
+scalaVersion := scala3Version
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -50,7 +50,7 @@ val publishSettings = Seq(
 val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "org.fomkin",
-  scalaVersion := scala2_13Version,
+  scalaVersion := scala3Version,
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
