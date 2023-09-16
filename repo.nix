@@ -3712,6 +3712,10 @@
       url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-sbt-bridge/3.3.1/scala3-sbt-bridge-3.3.1-sources.jar";
       sha256 = "17BBC9FC8CDDFDCDAA7874DE92FE554E0219F260347B4E269BFD3F0F448000BA";
     };
+    "nix-public/org/scala-lang/scala3-sbt-bridge/3.3.1/scala3-sbt-bridge-3.3.1.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-sbt-bridge/3.3.1/scala3-sbt-bridge-3.3.1.jar";
+      sha256 = "A311CC3805A3DFEF8D6CD79ACE80501ED26BD00D38DE6F225CFA0BF73FBDA725";
+    };
     "nix-public/org/scala-lang/scala3-sbt-bridge/3.3.1/scala3-sbt-bridge-3.3.1.pom" = {
       url = "https://repo1.maven.org/maven2/org/scala-lang/scala3-sbt-bridge/3.3.1/scala3-sbt-bridge-3.3.1.pom";
       sha256 = "1C299D3EAFD67E614DEF7979D3B262D87CAF1A870F799D440B83A1C317212B6A";

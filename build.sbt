@@ -23,6 +23,8 @@ val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
 
+version := "1.16.0-SNAPSHOT"
+
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
@@ -51,6 +53,7 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization := "org.fomkin",
   scalaVersion := scala3Version,
+  version := "1.16.0-SNAPSHOT",
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
