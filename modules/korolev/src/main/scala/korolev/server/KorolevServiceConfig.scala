@@ -44,7 +44,8 @@ case class KorolevServiceConfig[F[_], S, M](
   recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
   sessionIdleTimeout: FiniteDuration = 60.seconds,
   delayedRender: FiniteDuration = 0.seconds,
-  heartbeatLimit: Option[Int] = Some(2)
+  heartbeatLimit: Option[Int] = Some(2),
+  presetIds: Boolean = false
 )(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {

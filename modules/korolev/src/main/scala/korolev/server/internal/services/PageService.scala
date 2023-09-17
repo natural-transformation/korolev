@@ -13,7 +13,7 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
   type B = Binding[F, S, M]
 
   private val clw = {
-    val rc = new Html5RenderContext[F, S, M]()
+    val rc = new Html5RenderContext[F, S, M](config.presetIds)
     config.connectionLostWidget(rc)
     rc.mkString
   }
@@ -30,7 +30,8 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
           s"{interval:$interval}"
       }
     }
-    val kfg: String = s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat}"
+    val presetIds = if (config.presetIds)",kid:true" else ""
+    val kfg = s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds}"
 
     rc.openNode(XmlNs.html, "script")
     rc.addTextNode(kfg)
