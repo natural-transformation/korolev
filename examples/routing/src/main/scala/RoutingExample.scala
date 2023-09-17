@@ -75,13 +75,9 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               event("submit") { access =>
                 access.valueOf(inputId) flatMap { value =>
                   val todo = State.Todo(value, done = false)
-                  Future.successful {
-                    for (_ <- 0 until 3) {
-                      access.transition { s =>
-                        s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
-                      }
-                    }
-                  }.map(_ => ())
+                  access.transition { s =>
+                    s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
+                  }
                 }
               },
               input(
@@ -109,7 +105,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
       ),
-      delayedRender = 1.millis
+      delayedRender = 1000.millis
     )
   }
 }
