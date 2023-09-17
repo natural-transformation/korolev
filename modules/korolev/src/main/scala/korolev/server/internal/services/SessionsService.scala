@@ -140,7 +140,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
         // Top level state should exists. See 'initAppState'.
         initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
         in <- incomingHub.newStream()
-        frontend = new Frontend[F](in)
+        frontend = new Frontend[F](in, config.heartbeatLimit)
         app = new ApplicationInstance[F, S, M](
           qsid,
           frontend,

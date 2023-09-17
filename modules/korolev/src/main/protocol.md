@@ -27,6 +27,7 @@ From server to the client
  * 13 - UploadFile(id, descriptor, fileName)
  * 14 - ResetForm(id)
  * 15 - DownloadFile(name, descriptor)
+ * 16 - Heartbeat response from server
 
 ### Modify dom commands
 
