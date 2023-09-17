@@ -35,7 +35,7 @@ private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sess
     for {
       qsid <- sessionsService.initSession(request)
       state <- sessionsService.initAppState(qsid, request)
-      rc = new Html5RenderContext[F, S, M](config.emitIds)
+      rc = new Html5RenderContext[F, S, M](config.presetIds)
       proxy = pageService.setupStatelessProxy(rc, qsid)
       _ = rc.builder.append("<!DOCTYPE html>\n")
       _ = config.document(state)(proxy)
