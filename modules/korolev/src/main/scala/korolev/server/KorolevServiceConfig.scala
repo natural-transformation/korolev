@@ -45,7 +45,7 @@ case class KorolevServiceConfig[F[_], S, M](
   sessionIdleTimeout: FiniteDuration = 60.seconds,
   delayedRender: FiniteDuration = 0.seconds,
   heartbeatLimit: Option[Int] = Some(2),
-  emitIds: Boolean = false
+  presetIds: Boolean = false
 )(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {
