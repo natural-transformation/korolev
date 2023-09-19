@@ -234,6 +234,16 @@ abstract class Stream[F[_]: Effect, A] { self =>
     def cancel(): F[Unit] = self.cancel()
   }
 
+  def tap[U](f: A => F[U]): Stream[F, A] = new Stream[F, A] {
+    def pull(): F[Option[A]] = self
+      .pull()
+      .flatMap {
+        case None => Effect[F].none
+        case maybeValue @ Some(value) => f(value).as(maybeValue)
+      }
+    def cancel(): F[Unit] = self.cancel()
+  }
+
   def to[U](f: Stream[F, A] => F[U]): F[U] =
     f(this)
 
@@ -361,6 +371,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
 
     override def cancel(): F[Unit] = {
       self.cancel()
+      queue.close()
     }
   }
 }

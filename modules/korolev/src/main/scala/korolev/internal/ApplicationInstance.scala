@@ -103,9 +103,6 @@ final class ApplicationInstance
     if (devMode.isActive) Effect[F].delay(devMode.saveRenderContext(renderContext))
     else Effect[F].unit
 
-  private def nextRenderNum(): F[Int] =
-    Effect[F].delay(currentRenderNum.incrementAndGet())
-
   private def onState(maybeRenderCallback: Seq[Effect.Promise[Unit]]): F[Unit] = {
     for {
       snapshot <- stateManager.snapshot
@@ -127,7 +124,7 @@ final class ApplicationInstance
       _ <- frontend.performDomChanges(renderContext.diff)
       _ <- saveRenderContextIfNecessary()
       // Make korolev ready to next render
-      renderNum <- nextRenderNum()
+      renderNum = currentRenderNum.get()
       _ <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
       _ <- frontend.setRenderNum(renderNum)
       _ = maybeRenderCallback.foreach(_(Right(())))
@@ -236,6 +233,7 @@ final class ApplicationInstance
           .start
         _ <- if (delayedRender.toMillis > 0) {
           internalStateStream
+            .tap(_ => Effect[F].delay(currentRenderNum.incrementAndGet()))
             .buffer(delayedRender)
             .foreach { xs =>
               onState(xs.flatMap(_._3))
@@ -243,8 +241,9 @@ final class ApplicationInstance
             .start
         } else {
           internalStateStream
-            .foreach { xs =>
-              onState(xs._3.toSeq)
+            .foreach { x =>
+              currentRenderNum.incrementAndGet()
+              onState(x._3.toSeq)
             }
             .start
         }
