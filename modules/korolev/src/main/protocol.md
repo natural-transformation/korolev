@@ -11,7 +11,7 @@ From server to the client
 ]
 ```
 
- * 0 - SetRenderNum(n)
+ * 0 - SetRenderNum(id, eventType n)
  * 1 - Reload()
  * 2 - ListenEvent(type, preventDefault)
  * 3 - ExtractProperty(descriptor, id, propertyName)
@@ -22,7 +22,7 @@ From server to the client
  * 8 - ReloadCss()
  * 9 - Keep-alive message from server (noop)
  * 10 - EvalJs(descriptor, code)
- * 11 - ExtractEventData(descriptor, renderNum)
+ * 11 - ExtractEventData(descriptor, id)
  * 12 - ListFiles(id, descriptor)
  * 13 - UploadFile(id, descriptor, fileName)
  * 14 - ResetForm(id)

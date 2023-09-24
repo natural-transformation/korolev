@@ -22,10 +22,11 @@ import scala.annotation.switch
 import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.Metrics
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
+import levsha.events.EventId
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.concurrent.ExecutionContext
@@ -163,8 +164,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def changePageUrl(pq: PathAndQuery): F[Unit] =
     send(Procedure.ChangePageUrl.code, pq.mkString)
 
-  def setRenderNum(i: Int): F[Unit] =
-    send(Procedure.SetRenderNum.code, i)
+  def setRenderNum(id: Id, eventType: String, n: Int): F[Unit] =
+    send(Procedure.SetRenderNum.code, id.mkString, eventType, n)
 
   def reload(): F[Unit] =
     send(Procedure.Reload.code)
@@ -172,10 +173,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def reloadCss(): F[Unit] =
     send(Procedure.ReloadCss.code)
 
-  def extractEventData(renderNum: Int): F[String] =
+  def extractEventData(eventId: EventId): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ExtractEventData.code, descriptor, renderNum)
+      _ <- send(Procedure.ExtractEventData.code, descriptor, eventId.target.mkString, eventId.`type`)
       result <- stringPromises.get(descriptor)
     } yield result
 
@@ -325,7 +326,7 @@ object Frontend {
   }
 
   object Procedure {
-    case object SetRenderNum extends Procedure(0) // (n)
+    case object SetRenderNum extends Procedure(0) // (id, eventType, n)
     case object Reload extends Procedure(1) // ()
     case object ListenEvent extends Procedure(2) // (type, preventDefault)
     case object ExtractProperty extends Procedure(3) // (id, propertyName, descriptor)
@@ -336,7 +337,7 @@ object Frontend {
     case object ReloadCss extends Procedure(8) // ()
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
-    case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
+    case object ExtractEventData extends Procedure(11) // (descriptor, id, eventType)
     case object ListFiles extends Procedure(12) // (id, descriptor)
     case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
     case object RestForm extends Procedure(14) // (id)

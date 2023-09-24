@@ -105,7 +105,7 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
               Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
       ),
-      delayedRender = 1000.millis
+      delayedRender = 1.millis
     )
   }
 }

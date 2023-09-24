@@ -20,6 +20,10 @@ export const PropertyType = {
   ERROR: 4
 };
 
+function renderNumId(id, eventType) {
+  return `${id}_${eventType}`;
+}
+
 export class Korolev {
 
   /**
@@ -33,8 +37,8 @@ export class Korolev {
     this.root = document.children[0];
     /** @type {Object<Element>} */
     this.els = {};
-    /** @type {number} */
-    this.renderNum = 0;
+    /** @type {Object<number>} */
+    this.renderNum = {};
     /** @type {Array} */
     this.rootListeners = [];
     /** @type {?function(Event)} */
@@ -43,7 +47,7 @@ export class Korolev {
     this.initialPath = window.location.pathname;
     /** @type {function(CallbackType, string)} */
     this.callback = callback;
-    /** @type {Array} */
+    /** @type {Object<Event>} */
     this.eventData = [];
 
     this.listenRoot = (name, preventDefault) => {
@@ -52,8 +56,10 @@ export class Korolev {
           if (preventDefault) {
             event.preventDefault();
           }
-          this.eventData[this.renderNum] = event;
-          this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
+          let rnId = renderNumId(event.target.vId, event.type);
+          let rn = this.renderNum[rnId] ?? 0;
+          this.eventData[rnId] = event;
+          this.callback(CallbackType.DOM_EVENT, rn + ':' + event.target.vId + ':' + event.type);
         }
       };
       this.root.addEventListener(name, listener);
@@ -69,8 +75,10 @@ export class Korolev {
 
     this.windowHandler = (/** @type {Event} */ event) => {
       // 1 - event for top level element only ('body)
-      this.eventData[this.renderNum] = event.target;
-      callback(CallbackType.DOM_EVENT, this.renderNum + ':' + 1 + ':' + event.type);
+      let rnId = renderNumId('1', event.type);
+      this.eventData[rnId] = event;
+      const rn = this.renderNum[rnId] ?? 0;
+      callback(CallbackType.DOM_EVENT, rn + ':1:' + event.type);
     };
 
     window.addEventListener('popstate', this.historyHandler);
@@ -91,10 +99,11 @@ export class Korolev {
   }
 
   /** @param {number} n */
-  setRenderNum(n) {
+  setRenderNum(elementVId, eventType, n) {
     // Remove obsolete event data
-    delete this.eventData[n - 2];
-    this.renderNum = n;
+    let id = renderNumId(elementVId, eventType)
+    delete this.eventData[id];
+    this.renderNum[id] = n;
   }
 
   /** @param {HTMLElement} rootNode */
@@ -482,8 +491,8 @@ export class Korolev {
     }
   }
 
-  extractEventData(descriptor, renderNum) {
-    let data = this.eventData[renderNum];
+  extractEventData(descriptor, id, type) {
+    let data = this.eventData[renderNumId(id, type)];
     let result = {};
     for (let propertyName in data) {
       let value = data[propertyName];
