@@ -30,18 +30,30 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
       router = Router.empty[Future, String],
       render = {
         Issue14Spec.render(
-          firstEvent = event("mousedown") { access =>
-            access.transition { _ =>
+          firstEvents = Seq(
+            event("click") { access =>
+              access.transition { _ =>
+                counter += 1
+                "secondState"
+              }
+            },
+            event("mousedown") { access =>
               counter += 1
-              "secondState"
+              Future.unit
             }
-          },
-          secondEvent = event("click") { access =>
-            access.transition { _ =>
+          ),
+          secondEvents = Seq(
+            event("click") { access =>
+              access.transition { _ =>
+                counter += 1
+                "firstState"
+              }
+            },
+            event("mousedown") { access =>
               counter += 1
-              "firstState"
+              Future.unit
             }
-          }
+          )
         )
       },
       stateManager = new StateStorage.SimpleInMemoryStateManager[Future](),
@@ -67,11 +79,12 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
       incomingMessages.offerUnsafe(s"""[0,"$data"]""")
 
     app.initialize()
-    fireEvent("0:1_2_1:mousedown")
-    fireEvent("0:1_2_1:mouseup")
     fireEvent("0:1_2_1:click")
+    fireEvent("0:1_2_1:click")
+    fireEvent("0:1_2_1:mousedown")
+    fireEvent("1:1_2_1:click")
 
-    counter should be (1)
+    counter should be (3)
   }
 }
 
@@ -85,19 +98,19 @@ object Issue14Spec {
   import levsha.dsl._
   import html._
 
-  def render(firstEvent: Event, secondEvent: Event): Render = {
+  def render(firstEvents: Seq[Event], secondEvents: Seq[Event]): Render = {
     case "firstState" =>
       body(
         div("Hello"),
         div(
-          button("Click me", firstEvent)
+          button("Click me", firstEvents)
         )
       )
     case "secondState" =>
       body(
         div("Hello"),
         ul(
-          li("One", secondEvent),
+          li("One", secondEvents),
           li("Two"),
           li("Three")
         ),

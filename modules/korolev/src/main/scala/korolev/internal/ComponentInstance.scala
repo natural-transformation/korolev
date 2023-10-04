@@ -349,11 +349,11 @@ final class ComponentInstance[
           // for a long time.
           events.forall { event =>
             val k = (eventId.target, eventId.`type`)
-            if (rnMap.getOrElse(k, 0) == dem.renderNum) {
-              val newRenderNum = dem.renderNum + 1
-              rnMap.put(k, newRenderNum)
+            if (rnMap.getOrElse(k, 0) == dem.eventCounter) {
+              val newEventConter = dem.eventCounter + 1
+              rnMap.put(k, newEventConter)
               frontend
-                .setRenderNum(eventId.target, eventId.`type`, newRenderNum)
+                .setEventCounter(eventId.target, eventId.`type`, newEventConter)
                 .after(event.effect(BrowserAccess(eventId)))
                 .runAsync {
                   case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)

@@ -56,7 +56,7 @@ final class ApplicationInstance
   import reporter.Implicit
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
-  private val currentRenderNum = new TrieMap[(Id, String), Int]()
+  private val eventCounters = new TrieMap[(Id, String), Int]()
   private val stateQueue = Queue[F, (Id, Any, Option[Effect.Promise[Unit]])]()
   private val stateHub = Hub(stateQueue.stream)
   private val messagesQueue = Queue[F, M]()
@@ -152,7 +152,7 @@ final class ApplicationInstance
   private def onEvent(dem: DomEventMessage): F[Unit] =
     Effect[F].delay {
       calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
-        topLevelComponentInstance.applyEvent(eventId, dem, currentRenderNum)
+        topLevelComponentInstance.applyEvent(eventId, dem, eventCounters)
       }
       ()
     }
@@ -200,6 +200,7 @@ final class ApplicationInstance
       // 1. Old page in users browser
       // 2. Has saved render context
       for {
+        _ <- frontend.resetEventCounters()
         _ <- reloadCssIfNecessary()
         _ <- Effect[F].delay(renderContext.swap())
         // Serialized render context exists.
@@ -215,6 +216,7 @@ final class ApplicationInstance
 
       // Initialize with pre-rendered page
       for {
+        _ <- frontend.resetEventCounters()
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
         // Start handlers

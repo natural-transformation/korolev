@@ -62,7 +62,7 @@ export class Bridge {
     let pCode = commands.shift();
     let k = this._korolev;
     switch (pCode) {
-      case 0: k.setRenderNum.apply(k, commands); break;
+      case 0: k.setEventCounter.apply(k, commands); break;
       case 1:
         this._connection.disconnect(false);
         window.location.reload();
@@ -82,6 +82,7 @@ export class Bridge {
       case 14: k.resetForm.apply(k, commands); break;
       case 15: k.downloadFile.apply(k, commands); break;
       case 16: this._awaitingHeartbeat -= 1;break;
+      case 17: k.resetEventCounters.apply(k, commands); break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }
