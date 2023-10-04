@@ -102,6 +102,8 @@ export class Korolev {
     let self = this;
     function aux(prefix, node) {
       var children = node.childNodes;
+      var lastId = 0
+
       for (var i = 0; i < children.length; i++) {
         var child = children[i];
         var id
@@ -109,8 +111,9 @@ export class Korolev {
         if(self.config['kid']) {
           if(child.getAttribute && child.getAttribute('k')) {
             id = prefix + '_' + child.getAttribute('k');
+            lastId = child.getAttribute('k');
           }else {
-            id = prefix + '_' + '1';
+            id = prefix + '_' + (lastId.parseInt + 1);
           }
         } else {
           id = prefix + '_' + (i + 1);
