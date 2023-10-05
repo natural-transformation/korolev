@@ -48,7 +48,7 @@ export class Korolev {
     /** @type {function(CallbackType, string)} */
     this.callback = callback;
     /** @type {Object<Event>} */
-    this.eventData = [];
+    this.eventData = {};
 
     this.listenRoot = (name, preventDefault) => {
       var listener = (event) => {
@@ -57,7 +57,7 @@ export class Korolev {
             event.preventDefault();
           }
           let ecKey = eventCounterKey(event.target.vId, event.type);
-          let ec = this.eventCounter[ecKey] ?? 0;
+          let ec = this.eventCounters[ecKey] ?? 0;
           this.eventData[ecKey] = event;
           this.callback(CallbackType.DOM_EVENT, ec + ':' + event.target.vId + ':' + event.type);
         }
@@ -77,7 +77,7 @@ export class Korolev {
       // 1 - event for top level element only ('body)
       let ecKey = eventCounterKey('1', event.type);
       this.eventData[ecKey] = event;
-      const ec = this.eventCounter[ecKey] ?? 0;
+      const ec = this.eventCounters[ecKey] ?? 0;
       callback(CallbackType.DOM_EVENT, ec + ':1:' + event.type);
     };
 
@@ -98,7 +98,11 @@ export class Korolev {
     window.removeEventListener('resize', this.windowHandler);
   }
 
-  /** @param {number} n */
+  /** 
+   * @param {string} elementVId
+   * @param {string} eventType
+   * @param {number} n
+   */
   setEventCounter(elementVId, eventType, n) {
     // Remove obsolete event data
     let ecKey = eventCounterKey(elementVId, eventType)

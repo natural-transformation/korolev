@@ -352,9 +352,8 @@ final class ComponentInstance[
             if (rnMap.getOrElse(k, 0) == dem.eventCounter) {
               val newEventConter = dem.eventCounter + 1
               rnMap.put(k, newEventConter)
-              frontend
-                .setEventCounter(eventId.target, eventId.`type`, newEventConter)
-                .after(event.effect(BrowserAccess(eventId)))
+              event.effect(BrowserAccess(eventId))
+                .after(frontend.setEventCounter(eventId.target, eventId.`type`, newEventConter))
                 .runAsync {
                   case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
                   case _ => () // Do nothing

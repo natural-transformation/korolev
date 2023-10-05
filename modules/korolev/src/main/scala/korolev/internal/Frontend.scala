@@ -168,7 +168,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
     send(Procedure.SetEventCounter.code, id.mkString, eventType, n)
 
   def resetEventCounters(): F[Unit] =
-    send(Procedure.ResetEventCounters)
+    send(Procedure.ResetEventCounters.code)
 
   def reload(): F[Unit] =
     send(Procedure.Reload.code)
