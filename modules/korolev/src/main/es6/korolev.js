@@ -113,7 +113,8 @@ export class Korolev {
             id = prefix + '_' + child.getAttribute('k');
             lastId = child.getAttribute('k');
           }else {
-            id = prefix + '_' + (lastId.parseInt + 1);
+            lastId = lastId + 1;
+            id = prefix + '_' + lastId;
           }
         } else {
           id = prefix + '_' + (i + 1);
