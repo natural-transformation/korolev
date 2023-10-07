@@ -440,7 +440,7 @@ for {
 } yield ()
 -----------------------------------
 
-Note that `downloadFilesAsStream` gives you Korolev streams, which is not suitable to be used in applications. Korolev has built-in converters for popular stream libraries; see <<Streams>>. 
+Note that `downloadFilesAsStream` gives you Korolev streams, which is not suitable to be used in applications. Korolev has built-in converters for popular stream libraries; see <<Streams>>.
 
 ==== Uploading
 
@@ -737,6 +737,13 @@ access.transition(lens) { tab2 =>
 
 https://github.com/fomkin/korolev/blob/v1.5.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
 
+=== Heartbeat and Reconnection
+
+By default, the Korolev client-side sends a heartbeat every `5` seconds and tracks how many heartbeats are lost. After two consecutive lost heartbeats, the client performs a forced reconnection to the server. The heartbeat interval can be controlled with `KorolevServiceConfig.heartbeatInterval`. Additionally, you can disable bidirectional heartbeat by setting `KorolevServiceConfig.heartbeatLimit = None`. As a result, the client-side will send messages to the server, but the server will not respond.
+
+=== Emitting Korolev IDs
+
+In some cases, you may want to add analytics scripts or other third-party JavaScript to your page that modifies the DOM by adding elements to certain places. Sometimes this can lead to parts of your application ceasing to function. To address this issue, you can set `KorolevServiceConfig.presetIds=true`. As a result, all nodes managed by Korolev will receive an additional attribute `k="6", and Korolev will use these IDs to manage the DOM, ignoring any nodes added via third-party JavaScript.
 == Testing Korolev applications
 
 === Testkit
@@ -999,6 +1006,43 @@ https://github.com/fomkin/korolev/blob/v1.5.0/examples/akka-http/src/main/scala/
 This integration overrides default logging behavior to `akka.event.Logging`.
 
 Despite the fact that Akka uses standard Scala futures, the module can
+work we any effect type supported by Korolev
+
+=== Pekko HTTP
+
+Korolev provides smooth Pekko HTTP integration out of the box. To use it, add a dependency:
+
+[source,scala]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-pekko" % "1.5.0"
+------------------------------
+
+[source,scala]
+------------------------------
+val service = KorolevServiceConfig[...](
+  ...
+))
+------------------------------
+
+And create Korolev route:
+
+[source,scala]
+------------------------------
+val config = KorolevServiceConfig[Future, String, Any](
+  stateLoader = StateLoader.default("world"),
+  document = state => Html(body(div(s"Hello $state")))
+)
+
+val korolevRoute = akkaHttpService(config).apply(PekkoHttpServerConfig())
+------------------------------
+
+Then embed the route into your Akka HTTP routes structure.
+
+https://github.com/fomkin/korolev/blob/v1.5.0/examples/pekko-http/src/main/scala/PekkoHttpExample.scala[See full example]
+
+This integration overrides default logging behavior to `org.apache.pekko.event.Logging`.
+
+Despite the fact that Pekko uses standard Scala futures, the module can
 work we any effect type supported by Korolev
 
 === Zio-Http

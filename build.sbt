@@ -461,6 +461,14 @@ lazy val akkaHttpExample = project
   .settings(mainClass := Some("AkkaHttpExample"))
   .dependsOn(akka)
 
+lazy val pekkoHttpExample = project
+  .in(examples / "pekko-http")
+  .disablePlugins(HeaderPlugin)
+  .settings(crossVersionSettings)
+  .settings(exampleSettings: _*)
+  .settings(mainClass := Some("PekkoHttpExample"))
+  .dependsOn(pekko)
+
 lazy val zioHttpExample = project
   .in(examples / "zio-http")
   .disablePlugins(HeaderPlugin)
