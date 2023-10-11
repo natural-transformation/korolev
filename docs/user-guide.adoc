@@ -4,6 +4,7 @@
 :numbered:
 :toc:
 
+:version: 1.6.0
 :commit: 47197a88cff770ec254aeae5d5c684fb586e8e3a
 :code: https://gitflic.ru/project/fomkin/korolev/blob?commit={commit}&file=
 
@@ -783,9 +784,9 @@ Use Korolev Test Kit to simulate environment for event listeners and extensions.
 
 Add Test Kit dependency to your project. You can use use Test Kit with any suitable testing library which supports asynchronous testing.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-testkit" % "1.5.0" % Test
+libraryDependencies += "org.fomkin" %% "korolev-testkit" % "{version}" % Test
 ------------------------------
 
 Let's imagine that you are creating application which can to add two integer numbers and to show the result. The app has two text fields and a `span` tag to show the result. The view state of the app is `Option[Int]`. When one of the fields changes, the app reads values of inputs, adds them, and shows calculated result.
@@ -987,9 +988,9 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 Add the dependency.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-slf4j" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-slf4j" % "{version}"
 ------------------------------
 
 Configure reporter.
@@ -1006,9 +1007,9 @@ val config = KorolevServiceConfig(
 
 Korolev provides smooth Akka HTTP integration out of the box. To use it, add a dependency:
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-akka" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-akka" % "{version}"
 ------------------------------
 
 [source,scala]
@@ -1043,9 +1044,9 @@ work we any effect type supported by Korolev
 
 Korolev provides smooth Pekko HTTP integration out of the box. To use it, add a dependency:
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-pekko" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-pekko" % "{version}"
 ------------------------------
 
 [source,scala]
@@ -1082,9 +1083,9 @@ Korolev provides smooth Zio-Http integration out of the box.
 
 To use it, add a dependency:
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio-http" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio-http" % "{version}"
 ------------------------------
 
 And create Korolev service:
@@ -1133,16 +1134,16 @@ In addition to standard Scala Futures, Korolev can work with popular effects lib
 
 Add dependency for ZIO interop.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio" % "{version}"
 ------------------------------
 
 Or ZIO 2
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio2" % "{version}"
 ------------------------------
 
 Initialize your app with ZIO.
@@ -1165,9 +1166,9 @@ Korolev uses `Throwable` inside itself. That means if you want to work with your
 
 Add Monix interop dependency.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-monix" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-monix" % "{version}"
 ------------------------------
 
 Initialise your app with Monix. Ensure you have implicit `monix.execution.Scheduler` in the scope.
@@ -1186,16 +1187,16 @@ val config = KorolevServiceConfig[monix.eval.Task, MyState, Any](...)
 
 Add Cats dependency. If you use Cats Effect 2
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-ce2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-ce2" % "{version}"
 ------------------------------
 
 Or is you use Cats Effect 3
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-ce3" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-ce3" % "{version}"
 ------------------------------
 
 Initialise your app with IO.
@@ -1265,9 +1266,9 @@ myFlow.to(korolevSink)
 ==== ZIO
 
 To use it, add a dependency:
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "{version}"
 ------------------------------
 
 Conversion from Korolev to ZIO:
@@ -1301,12 +1302,12 @@ val io = ZStream.fromIterable(values)
 Conversion from Korolev to Fs2:
 
 To use it, add a dependency.
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
 // For Fs2-2.* and Cats Effect 2:
-libraryDependencies += "org.fomkin" %% "korolev-fs2-ce2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce2" % "{version}"
 // For Fs2-3.* and Cats Effect 3:
-libraryDependencies += "org.fomkin" %% "korolev-fs2-ce3" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce3" % "{version}"
 ------------------------------
 
 Conversion from Korolev to Fs2.
