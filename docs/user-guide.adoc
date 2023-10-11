@@ -4,7 +4,7 @@
 :numbered:
 :toc:
 
-:commit: 0283b4b53847f04b162f36a443e87e227a0e6eec
+:commit: 47197a88cff770ec254aeae5d5c684fb586e8e3a
 :code: https://gitflic.ru/project/fomkin/korolev/blob?commit={commit}&file=
 
 Aleksey Fomkin <a@fomkin.org>
