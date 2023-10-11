@@ -62,9 +62,19 @@ abstract class Component[
     */
   def render(parameters: P, state: S): context.Node
 
+  /**
+   * Render component while state is not loaded.
+   */
   def renderNoState(parameters: P): context.Node =
     levsha.dsl.html.div()
 
+  /**
+   * Parameters may be changed.
+   * Maybe you want to reload state.
+   * The function returns optional effect.
+   * If no reload required it returns None,
+   * else it returns effect with new state.
+   */
   def maybeUpdateState(parameters: P, currentState: S): Option[F[S]] = None
 }
 

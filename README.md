@@ -2,9 +2,6 @@
 
 <img src="https://fomkin.org/korolev/korolev-face-margin.svg" align="right" width="260" />
 
-[![Build Status](https://travis-ci.org/fomkin/korolev.svg?branch=master)](https://travis-ci.org/fomkin/korolev)
-[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Ffomkin%2Fkorolev.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Ffomkin%2Fkorolev?ref=badge_shield)
-[![Gitter](https://badges.gitter.im/fomkin/korolev.svg)](https://gitter.im/fomkin/korolev?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge)
 [![Join the chat at https://telegram.me/korolev_io](https://img.shields.io/badge/chat-on_telegram_(russian)-0088cc.svg)](https://telegram.me/korolev_io)
 
 Not long ago we have entered the era of single-page applications. Some people say that we no longer need a server. They say that JavaScript applications can connect to DBMS directly. Fat clients. **We disagree with this.** This project is an attempt to solve the problems of modern fat web.
