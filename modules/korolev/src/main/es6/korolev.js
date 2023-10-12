@@ -2,7 +2,7 @@ import { encodeRFC5987ValueChars } from './utils.js';
 
 /** @enum {number} */
 export const CallbackType = {
-  DOM_EVENT: 0, // `$renderNum:$elementId:$eventType`
+  DOM_EVENT: 0, // `$eventCounter:$elementId:$eventType`
   CUSTOM_CALLBACK: 1, // `$name:$arg`
   EXTRACT_PROPERTY_RESPONSE: 2, // `$descriptor:$propertyType:$value`
   HISTORY: 3, // URL
@@ -20,6 +20,10 @@ export const PropertyType = {
   ERROR: 4
 };
 
+function eventCounterKey(id, eventType) {
+  return `${id}_${eventType}`;
+}
+
 export class Korolev {
 
   /**
@@ -33,8 +37,8 @@ export class Korolev {
     this.root = document.children[0];
     /** @type {Object<Element>} */
     this.els = {};
-    /** @type {number} */
-    this.renderNum = 0;
+    /** @type {Object<number>} */
+    this.eventCounters = {};
     /** @type {Array} */
     this.rootListeners = [];
     /** @type {?function(Event)} */
@@ -43,8 +47,8 @@ export class Korolev {
     this.initialPath = window.location.pathname;
     /** @type {function(CallbackType, string)} */
     this.callback = callback;
-    /** @type {Array} */
-    this.eventData = [];
+    /** @type {Object<Event>} */
+    this.eventData = {};
 
     this.listenRoot = (name, preventDefault) => {
       var listener = (event) => {
@@ -52,8 +56,10 @@ export class Korolev {
           if (preventDefault) {
             event.preventDefault();
           }
-          this.eventData[this.renderNum] = event;
-          this.callback(CallbackType.DOM_EVENT, this.renderNum + ':' + event.target.vId + ':' + event.type);
+          let ecKey = eventCounterKey(event.target.vId, event.type);
+          let ec = this.eventCounters[ecKey] ?? 0;
+          this.eventData[ecKey] = event;
+          this.callback(CallbackType.DOM_EVENT, ec + ':' + event.target.vId + ':' + event.type);
         }
       };
       this.root.addEventListener(name, listener);
@@ -69,8 +75,10 @@ export class Korolev {
 
     this.windowHandler = (/** @type {Event} */ event) => {
       // 1 - event for top level element only ('body)
-      this.eventData[this.renderNum] = event.target;
-      callback(CallbackType.DOM_EVENT, this.renderNum + ':' + 1 + ':' + event.type);
+      let ecKey = eventCounterKey('1', event.type);
+      this.eventData[ecKey] = event;
+      const ec = this.eventCounters[ecKey] ?? 0;
+      callback(CallbackType.DOM_EVENT, ec + ':1:' + event.type);
     };
 
     window.addEventListener('popstate', this.historyHandler);
@@ -90,11 +98,21 @@ export class Korolev {
     window.removeEventListener('resize', this.windowHandler);
   }
 
-  /** @param {number} n */
-  setRenderNum(n) {
+  /** 
+   * @param {string} elementVId
+   * @param {string} eventType
+   * @param {number} n
+   */
+  setEventCounter(elementVId, eventType, n) {
     // Remove obsolete event data
-    delete this.eventData[n - 2];
-    this.renderNum = n;
+    let ecKey = eventCounterKey(elementVId, eventType)
+    delete this.eventData[ecKey];
+    this.eventCounters[ecKey] = n;
+  }
+
+  resetEventCounters() {
+    this.eventData = {};
+    this.eventCounters = {};
   }
 
   /** @param {HTMLElement} rootNode */
@@ -483,8 +501,8 @@ export class Korolev {
     }
   }
 
-  extractEventData(descriptor, renderNum) {
-    let data = this.eventData[renderNum];
+  extractEventData(descriptor, id, type) {
+    let data = this.eventData[eventCounterKey(id, type)];
     let result = {};
     for (let propertyName in data) {
       let value = data[propertyName];

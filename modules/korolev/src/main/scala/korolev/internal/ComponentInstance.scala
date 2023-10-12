@@ -21,14 +21,16 @@ import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax.*
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import levsha.{Id, StatefulRenderContext}
-import levsha.events.EventId
+import levsha.events.{EventId, EventPhase}
 
 import scala.collection.mutable
 import Context.*
 import korolev.data.Bytes
+import korolev.internal.Frontend.DomEventMessage
 import korolev.util.{JsCode, Lens}
 import korolev.web.FormData
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
@@ -58,7 +60,6 @@ final class ComponentInstance[
     frontend: Frontend[F],
     eventRegistry: EventRegistry[F],
     stateManager: StateManager[F],
-    getRenderNum: () => Int,
     val component: Component[F, CS, P, E],
     stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
     createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]],
@@ -89,7 +90,7 @@ final class ComponentInstance[
 
   @volatile private var eventSubscription = Option.empty[E => _]
 
-  private[korolev] object browserAccess extends BaseAccessDefault[F, CS, E] {
+  private[korolev] case class BrowserAccess(eventId: EventId) extends BaseAccessDefault[F, CS, E] {
 
     private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
@@ -207,11 +208,13 @@ final class ComponentInstance[
     def evalJs(code: JsCode): F[String] =
       frontend.evalJs(code.mkString(unsafeGetId))
 
-    def eventData: F[String] = frontend.extractEventData(getRenderNum())
+    def eventData: F[String] = frontend.extractEventData(eventId)
 
     def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
       frontend.registerCustomCallback(name)(f)
   }
+
+  private[korolev] val browserAccess = BrowserAccess(EventId(Id.TopLevel, "init", EventPhase.AtTarget))
 
   /**
     * Subscribes to component instance events.
@@ -286,7 +289,6 @@ final class ComponentInstance[
                   frontend,
                   eventRegistry,
                   stateManager,
-                  getRenderNum,
                   stateQueue,
                   scheduler,
                   reporter,
@@ -336,7 +338,7 @@ final class ComponentInstance[
     pendingEffects.enqueue(effect)
   }
 
-  def applyEvent(eventId: EventId): Boolean = {
+  def applyEvent(eventId: EventId, dem: DomEventMessage, rnMap: TrieMap[(Id, String), Int]): Boolean = {
     try {
       events.get(eventId) match {
         case Some(events: Vector[Event[F, CS, E]]) =>
@@ -346,15 +348,24 @@ final class ComponentInstance[
           // the user's code waits for something
           // for a long time.
           events.forall { event =>
-            event.effect(browserAccess).runAsync {
-              case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
-              case _       => () // Do nothing
+            val k = (eventId.target, eventId.`type`)
+            if (rnMap.getOrElse(k, 0) == dem.eventCounter) {
+              val newEventConter = dem.eventCounter + 1
+              rnMap.put(k, newEventConter)
+              event.effect(BrowserAccess(eventId))
+                .after(frontend.setEventCounter(eventId.target, eventId.`type`, newEventConter))
+                .runAsync {
+                  case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
+                  case _ => () // Do nothing
+                }
+              !event.stopPropagation
+            } else {
+              true
             }
-            !event.stopPropagation
           }
         case None =>
           nestedComponents.values.forall { nested =>
-            nested.applyEvent(eventId)
+            nested.applyEvent(eventId, dem, rnMap)
           }
       }
     } catch {

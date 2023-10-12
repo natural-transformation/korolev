@@ -24,11 +24,12 @@ import korolev.effect.{Effect, Hub, Queue, Reporter, Scheduler, Stream}
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.web.{Path, PathAndQuery}
-import levsha.events.calculateEventPropagation
+import levsha.events.{EventId, calculateEventPropagation}
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
 import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
@@ -55,7 +56,7 @@ final class ApplicationInstance
   import reporter.Implicit
 
   private val devMode = new DevMode.ForRenderContext(sessionId.toString)
-  private val currentRenderNum = new AtomicInteger(0)
+  private val eventCounters = new TrieMap[(Id, String), Int]()
   private val stateQueue = Queue[F, (Id, Any, Option[Effect.Promise[Unit]])]()
   private val stateHub = Hub(stateQueue.stream)
   private val messagesQueue = Queue[F, M]()
@@ -86,7 +87,7 @@ final class ApplicationInstance
     }
     val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
       Id.TopLevel, sessionId, frontend, eventRegistry,
-      stateManager, () => currentRenderNum.get(), component,
+      stateManager, component,
       stateQueue, createMiscProxy, scheduler, reporter,
       { case ex: Throwable =>
         topLevelComponentInstance.browserAccess.transition(recovery(ex))
@@ -124,9 +125,7 @@ final class ApplicationInstance
       _ <- frontend.performDomChanges(renderContext.diff)
       _ <- saveRenderContextIfNecessary()
       // Make korolev ready to next render
-      renderNum = currentRenderNum.get()
       _ <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
-      _ <- frontend.setRenderNum(renderNum)
       _ = maybeRenderCallback.foreach(_(Right(())))
     } yield ()
   }
@@ -152,12 +151,10 @@ final class ApplicationInstance
 
   private def onEvent(dem: DomEventMessage): F[Unit] =
     Effect[F].delay {
-      if (currentRenderNum.get == dem.renderNum) {
-        calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
-          topLevelComponentInstance.applyEvent(eventId)
-        }
-        ()
+      calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
+        topLevelComponentInstance.applyEvent(eventId, dem, eventCounters)
       }
+      ()
     }
 
   private final val internalStateStream =
@@ -203,7 +200,7 @@ final class ApplicationInstance
       // 1. Old page in users browser
       // 2. Has saved render context
       for {
-        _ <- frontend.setRenderNum(0)
+        _ <- frontend.resetEventCounters()
         _ <- reloadCssIfNecessary()
         _ <- Effect[F].delay(renderContext.swap())
         // Serialized render context exists.
@@ -219,7 +216,7 @@ final class ApplicationInstance
 
       // Initialize with pre-rendered page
       for {
-        _ <- frontend.setRenderNum(0)
+        _ <- frontend.resetEventCounters()
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
         // Start handlers
@@ -233,7 +230,6 @@ final class ApplicationInstance
           .start
         _ <- if (delayedRender.toMillis > 0) {
           internalStateStream
-            .tap(_ => Effect[F].delay(currentRenderNum.incrementAndGet()))
             .buffer(delayedRender)
             .foreach { xs =>
               onState(xs.flatMap(_._3))
@@ -242,7 +238,6 @@ final class ApplicationInstance
         } else {
           internalStateStream
             .foreach { x =>
-              currentRenderNum.incrementAndGet()
               onState(x._3.toSeq)
             }
             .start

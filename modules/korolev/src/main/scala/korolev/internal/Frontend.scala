@@ -22,10 +22,11 @@ import scala.annotation.switch
 import korolev.Context.FileHandler
 import korolev.data.Bytes
 import korolev.web.{FormData, PathAndQuery}
-import korolev.effect.syntax._
+import korolev.effect.syntax.*
 import korolev.Metrics
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
 import levsha.Id
+import levsha.events.EventId
 import levsha.impl.DiffRenderContext.ChangesPerformer
 
 import scala.concurrent.ExecutionContext
@@ -66,8 +67,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   val domEventMessages: Stream[F, Frontend.DomEventMessage] =
     rawDomEvents.map {
       case (_, args) =>
-        val Array(renderNum, target, tpe) = args.split(':')
-        DomEventMessage(renderNum.toInt, Id(target), tpe)
+        val Array(eventCounter, target, tpe) = args.split(':')
+        DomEventMessage(eventCounter.toInt, Id(target), tpe)
     }
 
   val browserHistoryMessages: Stream[F, PathAndQuery] =
@@ -163,8 +164,11 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def changePageUrl(pq: PathAndQuery): F[Unit] =
     send(Procedure.ChangePageUrl.code, pq.mkString)
 
-  def setRenderNum(i: Int): F[Unit] =
-    send(Procedure.SetRenderNum.code, i)
+  def setEventCounter(id: Id, eventType: String, n: Int): F[Unit] =
+    send(Procedure.SetEventCounter.code, id.mkString, eventType, n)
+
+  def resetEventCounters(): F[Unit] =
+    send(Procedure.ResetEventCounters.code)
 
   def reload(): F[Unit] =
     send(Procedure.Reload.code)
@@ -172,10 +176,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def reloadCss(): F[Unit] =
     send(Procedure.ReloadCss.code)
 
-  def extractEventData(renderNum: Int): F[String] =
+  def extractEventData(eventId: EventId): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ExtractEventData.code, descriptor, renderNum)
+      _ <- send(Procedure.ExtractEventData.code, descriptor, eventId.target.mkString, eventId.`type`)
       result <- stringPromises.get(descriptor)
     } yield result
 
@@ -318,14 +322,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
 
 object Frontend {
 
-  final case class DomEventMessage(renderNum: Int, target: Id, eventType: String)
+  final case class DomEventMessage(eventCounter: Int, target: Id, eventType: String)
 
   sealed abstract class Procedure(final val code: Int) {
     final val codeString = code.toString
   }
 
   object Procedure {
-    case object SetRenderNum extends Procedure(0) // (n)
+    case object SetEventCounter extends Procedure(0) // (id, eventType, n)
     case object Reload extends Procedure(1) // ()
     case object ListenEvent extends Procedure(2) // (type, preventDefault)
     case object ExtractProperty extends Procedure(3) // (id, propertyName, descriptor)
@@ -336,15 +340,16 @@ object Frontend {
     case object ReloadCss extends Procedure(8) // ()
     case object KeepAlive extends Procedure(9) // ()
     case object EvalJs extends Procedure(10) // (code)
-    case object ExtractEventData extends Procedure(11) // (descriptor, renderNum)
+    case object ExtractEventData extends Procedure(11) // (descriptor, id, eventType)
     case object ListFiles extends Procedure(12) // (id, descriptor)
     case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
     case object RestForm extends Procedure(14) // (id)
     case object DownloadFile extends Procedure(15) // (descriptor, fileName)
-    case object Heartbeat extends Procedure(16) // (descriptor, fileName)
+    case object Heartbeat extends Procedure(16) // ()
+    case object ResetEventCounters extends Procedure(16) // ()
 
     val All = Set(
-      SetRenderNum,
+      SetEventCounter,
       Reload,
       ListenEvent,
       ExtractProperty,
@@ -360,7 +365,8 @@ object Frontend {
       UploadFile,
       RestForm,
       DownloadFile,
-      Heartbeat
+      Heartbeat,
+      ResetEventCounters
     )
 
     def apply(n: Int): Option[Procedure] =
@@ -401,7 +407,7 @@ object Frontend {
   sealed abstract class CallbackType(final val code: Int)
 
   object CallbackType {
-    case object DomEvent extends CallbackType(0) // `$renderNum:$elementId:$eventType`
+    case object DomEvent extends CallbackType(0) // `$eventCounter:$elementId:$eventType`
     case object CustomCallback extends CallbackType(1) // `$name:arg`
     case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
     case object History extends CallbackType(3) // URL

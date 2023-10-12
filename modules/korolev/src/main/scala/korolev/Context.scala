@@ -427,13 +427,12 @@ object Context {
                        frontend: Frontend[F],
                        eventRegistry: EventRegistry[F],
                        stateManager: StateManager[F],
-                       getRenderNum: () => Int,
                        stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
                        scheduler: Scheduler[F],
                        reporter: Reporter,
                        recovery: PartialFunction[Throwable, F[Unit]]): ComponentInstance[F, AS, M, CS, P, E] = {
       new ComponentInstance(
-        node, sessionId, frontend, eventRegistry, stateManager, getRenderNum, component, stateQueue,
+        node, sessionId, frontend, eventRegistry, stateManager, component, stateQueue,
         createMiscProxy = (rc, k) => new StatefulRenderContext[Binding[F, CS, E]] {
           def currentContainerId: Id = rc.currentContainerId
           def currentId: Id = rc.currentId
