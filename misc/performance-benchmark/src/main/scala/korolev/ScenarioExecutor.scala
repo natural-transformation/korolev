@@ -1,20 +1,23 @@
 package korolev
 
-import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
+import akka.actor.typed.scaladsl.Behaviors
 import korolev.data._
-
 import scala.annotation.tailrec
 import scala.concurrent.duration.FiniteDuration
 
 object ScenarioExecutor {
 
-  def apply(scenario: Scenario,
-            reporter: ActorRef[Report],
-            delay: Option[FiniteDuration] = None): Behavior[FromServer] = {
+  def apply(
+    scenario: Scenario,
+    reporter: ActorRef[Report],
+    delay: Option[FiniteDuration] = None
+  ): Behavior[FromServer] = {
     @tailrec
-    def sendUntilExpect(state: ScenarioState,
-                        connection: ActorRef[ToServer]): (ScenarioState, Option[ScenarioStep.Expect]) = {
+    def sendUntilExpect(
+      state: ScenarioState,
+      connection: ActorRef[ToServer]
+    ): (ScenarioState, Option[ScenarioStep.Expect]) =
       state.current match {
         case Some(ScenarioStep.Send(_, message)) =>
           connection ! message
@@ -22,11 +25,12 @@ object ScenarioExecutor {
         case Some(expect: ScenarioStep.Expect) => (state, Some(expect))
         case None                              => (state, None)
       }
-    }
 
-    def sendUntilExpectAndReport(currentState: ScenarioState,
-                                 metrics: Map[Int, Long],
-                                 connection: ActorRef[ToServer]): Behavior[FromServer] = {
+    def sendUntilExpectAndReport(
+      currentState: ScenarioState,
+      metrics: Map[Int, Long],
+      connection: ActorRef[ToServer]
+    ): Behavior[FromServer] =
       sendUntilExpect(currentState, connection) match {
         case (state, Some(next)) =>
           await(System.nanoTime(), metrics, state, next.value, connection)
@@ -35,24 +39,23 @@ object ScenarioExecutor {
           connection ! ToServer.Close
           Behaviors.stopped
       }
-    }
 
-    def await(nanos: Long,
-              currMetrics: Map[Int, Long],
-              currState: ScenarioState,
-              expected: FromServer,
-              connection: ActorRef[ToServer]): Behavior[FromServer] = {
-
+    def await(
+      nanos: Long,
+      currMetrics: Map[Int, Long],
+      currState: ScenarioState,
+      expected: FromServer,
+      connection: ActorRef[ToServer]
+    ): Behavior[FromServer] =
       Behaviors.receiveMessagePartial[FromServer] {
         case `expected` =>
-          val dt = System.nanoTime() - nanos
+          val dt      = System.nanoTime() - nanos
           val metrics = currMetrics + (currState.step -> dt)
           sendUntilExpectAndReport(currState.next, metrics, connection)
         case unexpected =>
           reporter ! Report.Unexpected(currState, expected, unexpected)
           Behaviors.stopped
       }
-    }
 
     Behaviors.setup[FromServer] { ctx =>
       Behaviors
@@ -99,10 +102,9 @@ object ScenarioExecutor {
             reporter ! Report.MessagesFromClosedConnection(message)
             Behaviors.stopped
         }
-        .receiveSignal {
-          case (_, Terminated(_)) ⇒
-            reporter ! Report.SuddenlyClosed
-            Behaviors.stopped
+        .receiveSignal { case (_, Terminated(_)) =>
+          reporter ! Report.SuddenlyClosed
+          Behaviors.stopped
         }
     }
   }

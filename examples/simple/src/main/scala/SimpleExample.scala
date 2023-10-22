@@ -8,8 +8,8 @@ import scala.concurrent.Future
 object SimpleExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   // Handler to input
   val inputId     = elementId()

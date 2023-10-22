@@ -6,8 +6,8 @@ import scala.concurrent.Future
 final class BlogView(val ctx: Context.Scope[Future, ViewState, ViewState.Tab.Blog, Any]) {
 
   import ctx._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   private val nameInput: ctx.ElementId = elementId()
 

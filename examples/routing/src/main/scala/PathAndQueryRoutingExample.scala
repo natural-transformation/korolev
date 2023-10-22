@@ -18,8 +18,8 @@ object PathAndQueryRoutingExample extends SimpleAkkaHttpKorolevApp {
   }
 
   import State.globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   val beginElementId = elementId()
   val endElementId   = elementId()

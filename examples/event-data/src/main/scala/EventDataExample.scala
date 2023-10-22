@@ -10,8 +10,8 @@ object EventDataExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, String, Any]
 
   import globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   val service = akkaHttpService {
     KorolevServiceConfig[Future, String, Any](

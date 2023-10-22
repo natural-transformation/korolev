@@ -11,8 +11,8 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, Option[Int], Any]
 
   import globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Option[Int], Any](

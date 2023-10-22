@@ -1,21 +1,18 @@
 package korolev
 
-import java.io.File
-
 import akka.actor.ActorSystem
 import akka.actor.typed.Behavior
 import akka.actor.typed.scaladsl.Behaviors
 import akka.actor.typed.scaladsl.adapter._
 import com.typesafe.config.ConfigFactory
+import java.io.File
 import korolev.data.{FromServer, Report, Scenario, ToServer}
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
 
 object PerformanceBenchmark extends App {
 
-  def setup(scenario: Scenario, conf: BenchmarkConfiguration)(implicit untypedSystem: ActorSystem): Behavior[ToServer] = {
-
+  def setup(scenario: Scenario, conf: BenchmarkConfiguration)(implicit untypedSystem: ActorSystem): Behavior[ToServer] =
     Behaviors.setup[ToServer] { ctx =>
       val reporter = ctx.spawnAnonymous {
         Behaviors.receiveMessagePartial[Report] {
@@ -24,11 +21,11 @@ object PerformanceBenchmark extends App {
             Behaviors.same
 
           case Report.Success(_, metrics) =>
-            val ts = metrics.values.toVector
-            val avg = (ts.sum / ts.length) / 1000000d
+            val ts   = metrics.values.toVector
+            val avg  = (ts.sum / ts.length) / 1000000d
             val mean = ts.sorted.apply(ts.length / 2) / 1000000d
-            val min = ts.min / 1000000d
-            val max = ts.max / 1000000d
+            val min  = ts.min / 1000000d
+            val max  = ts.max / 1000000d
             println(s"avg: $avg, mean: $mean in [$min, $max]")
             Behaviors.same
 
@@ -61,7 +58,6 @@ object PerformanceBenchmark extends App {
 
       Behaviors.ignore
     }
-  }
 
   args match {
     case Array(fileName) =>

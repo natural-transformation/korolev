@@ -8,8 +8,8 @@ import scala.concurrent.Future
 object WebComponentExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   private def setLatLon(lat: Double, lon: Double): (Access => EventResult) = { (access: Access) =>
     access.transition { case s =>

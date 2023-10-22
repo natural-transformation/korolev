@@ -20,7 +20,6 @@ object OneByOneFileStreamingExample extends SimpleAkkaHttpKorolevApp {
   import levsha.dsl._
   import levsha.dsl.html._
 
-
   val fileInput = elementId()
 
   def onUploadClick(access: Access): Task[Unit] = {

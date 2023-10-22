@@ -11,8 +11,8 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
   val ctx = Context[Task, Option[String], Any]
 
   import ctx._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   private val aInput = elementId()
   private val bInput = elementId()

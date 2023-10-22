@@ -1,8 +1,6 @@
-
 import akka.actor.ActorSystem
 import org.openqa.selenium.{JavascriptExecutor, WebDriver, WebElement}
 import org.slf4j.LoggerFactory
-
 import scala.concurrent.duration._
 
 package object tools {
@@ -15,22 +13,19 @@ package object tools {
   def scenario(name: String)(steps: Step*)(implicit as: ActorSystem): Scenario =
     Scenario(name, steps)
 
-  def assert(message: String, f: => Boolean) = {
+  def assert(message: String, f: => Boolean) =
     if (!f) {
       val exception = new AssertionError(message)
       throw exception
     } else {
       StepResult.Ok
     }
-  }
 
-  def fail(message: String): Unit = {
+  def fail(message: String): Unit =
     throw new AssertionError(message)
-  }
 
-  def sleep(duration: FiniteDuration): Unit = {
+  def sleep(duration: FiniteDuration): Unit =
     Thread.sleep(duration.toMillis)
-  }
 
   implicit final class WebElementOps(val el: WebElement) extends AnyVal {
     def scrollTo()(implicit webDriver: WebDriver): Unit = webDriver match {

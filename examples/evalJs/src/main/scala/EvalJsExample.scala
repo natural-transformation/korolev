@@ -10,8 +10,8 @@ object EvalJsExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, String, Any]
 
   import globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   private def onClick(access: Access) =
     for {

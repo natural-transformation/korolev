@@ -54,6 +54,7 @@ val commonSettings = publishSettings ++ Seq(
   organization       := "org.fomkin",
   scalaVersion       := scala3Version,
   version            := "1.16.0-SNAPSHOT",
+  scalafmtOnCompile  := false,
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {

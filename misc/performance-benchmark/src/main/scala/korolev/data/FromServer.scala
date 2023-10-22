@@ -12,26 +12,25 @@ object FromServer {
 
   object Procedure {
 
-    def apply(code: Int, args: List[Any]): Procedure = {
+    def apply(code: Int, args: List[Any]): Procedure =
       new Procedure(Frontend.Procedure(code).get, args)
-    }
 
     def fromJson(ast: Value): Either[String, Procedure] =
       try {
         ast match {
           case arr: Arr =>
             val Num(procedureId) :: argsAsts = arr.value.toList
-            val code = procedureId.toInt
+            val code                         = procedureId.toInt
 
             Frontend.Procedure(code) match {
               case Some(procedure) =>
                 val args = argsAsts.collect {
-                  case Str(s) => s
+                  case Str(s)                             => s
                   case Num(n) if n.toString.contains(".") => n.toDouble
-                  case Num(n) => n.toInt
-                  case False => false
-                  case True => true
-                  case Null => null
+                  case Num(n)                             => n.toInt
+                  case False                              => false
+                  case True                               => true
+                  case Null                               => null
                 }
                 Right(FromServer.Procedure(procedure, args))
               case None => Left(s"unknown procedure #$code")

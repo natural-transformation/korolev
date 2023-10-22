@@ -11,8 +11,8 @@ import scala.concurrent.Future
 object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(maxRequestBodySize = 20 * 1024 * 1024)) {
 
   import State.globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   val role = AttrDef(XmlNs.html, "role")
 

@@ -17,8 +17,8 @@ object CatsIOExample extends App {
   }
 
   import applicationContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   // Handler to input
   private val inputId     = elementId()

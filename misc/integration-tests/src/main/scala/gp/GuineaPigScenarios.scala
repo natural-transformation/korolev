@@ -2,27 +2,26 @@ package gp
 
 import java.io.{File, PrintWriter}
 import java.util.regex.Pattern
-
+import org.openqa.selenium.{By, Platform, WebDriver}
 import org.openqa.selenium.remote.{LocalFileDetector, RemoteWebDriver}
 import org.openqa.selenium.support.ui.{ExpectedConditions, WebDriverWait}
-import org.openqa.selenium.{By, Platform, WebDriver}
-import tools._
-
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
+import tools._
 
 object GuineaPigScenarios {
 
   private val appUrl = "http://localhost:8000"
 
-  private def wait(wd: WebDriver):WebDriverWait = new WebDriverWait(wd, 60)
+  private def wait(wd: WebDriver): WebDriverWait = new WebDriverWait(wd, 60)
 
   val allInOne = scenario("All-in-one scenario")(
     step("Page should be open successfully") { wd =>
       // Open browser
       wd.get(appUrl + "/")
       assert("Title", wd.getTitle == "The Test App")
-      assert("Connected",
+      assert(
+        "Connected",
         wait(wd).until(
           ExpectedConditions.textMatches(
             By.id("debug-log-label"),
@@ -41,30 +40,36 @@ object GuineaPigScenarios {
         .asScala
         .head
       firstToDoCheckBox.click()
-      assert("Todo should be checked", wait(wd).until(
-        ExpectedConditions.attributeContains(
-          firstToDoCheckBox,
-          "class",
-          "todo_checkbox__checked"
+      assert(
+        "Todo should be checked",
+        wait(wd).until(
+          ExpectedConditions.attributeContains(
+            firstToDoCheckBox,
+            "class",
+            "todo_checkbox__checked"
+          )
         )
-      ))
+      )
     },
     step("Todo should be added after 'Add todo' click") { implicit wd =>
       // Add new row
       val newTodoText = "Hello world"
-      val input = wd.findElement(By.id("todo-input"))
+      val input       = wd.findElement(By.id("todo-input"))
       input.scrollTo()
       input.sendKeys(newTodoText)
       sleep(5000.millis)
       wd.findElement(By.id("todo-submit-button")).click()
       sleep(1.second)
       // Check new dod
-      assert(s"Last todo text should contain $newTodoText", wait(wd).until(
-        ExpectedConditions.textToBe(
-          By.xpath("(//div[@class='todo'])[last()]"),
-          newTodoText
+      assert(
+        s"Last todo text should contain $newTodoText",
+        wait(wd).until(
+          ExpectedConditions.textToBe(
+            By.xpath("(//div[@class='todo'])[last()]"),
+            newTodoText
+          )
         )
-      ))
+      )
     },
     step("Field should be empty after todo was added") { wd =>
       val value = wd.findElement(By.id("todo-input")).getAttribute("value")
@@ -83,10 +88,12 @@ object GuineaPigScenarios {
         input.scrollTo()
         input.sendKeys("k")
         sleep(5000.millis)
-        assert(s"theKey should contain 'd'",
-           wait(wd).until(
-             ExpectedConditions.textToBe(By.id("theKey"), "k")
-           ))
+        assert(
+          s"theKey should contain 'd'",
+          wait(wd).until(
+            ExpectedConditions.textToBe(By.id("theKey"), "k")
+          )
+        )
       } else {
         StepResult.CowardlySkipped("Not supported")
       }
@@ -102,7 +109,7 @@ object GuineaPigScenarios {
             case Platform.MAC | Platform.ANDROID => false
             // TODO understand reason why test fails on Edge
             case _ if r.getCapabilities.getBrowserName == "MicrosoftEdge" => false
-            case _ => true
+            case _                                                        => true
           }
         case _ => true
       }
@@ -117,14 +124,16 @@ object GuineaPigScenarios {
         wd.findElement(By.name("upload-input")).sendKeys(file.getAbsolutePath)
         sleep(3.second)
         wd.findElement(By.id("upload-button")).click()
-        assert(s"upload-text.textContent should be $text", wait(wd).until(
-          ExpectedConditions.textToBe(
-            By.id("upload-text"),
-            text
+        assert(
+          s"upload-text.textContent should be $text",
+          wait(wd).until(
+            ExpectedConditions.textToBe(
+              By.id("upload-text"),
+              text
+            )
           )
-        ))
-      }
-      else {
+        )
+      } else {
         StepResult.CowardlySkipped("Not supported")
       }
     },
@@ -156,12 +165,15 @@ object GuineaPigScenarios {
       val el = wd.findElement(By.id("the-component"))
       el.click()
       sleep(3.second)
-      assert(s"upload-text.textContent should be 'Cat'", wait(wd).until(
-        ExpectedConditions.textToBe(
-          By.id("from-component"),
-          "Cat"
+      assert(
+        s"upload-text.textContent should be 'Cat'",
+        wait(wd).until(
+          ExpectedConditions.textToBe(
+            By.id("from-component"),
+            "Cat"
+          )
         )
-      ))
+      )
     }
   )
 

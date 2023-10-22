@@ -5,35 +5,36 @@ import akka.actor.ActorSystem
 import akka.actor.typed.{ActorRef, Behavior, Terminated}
 import akka.actor.typed.scaladsl.Behaviors
 import akka.http.scaladsl.Http
-import akka.http.scaladsl.model.headers.Cookie
-import akka.http.scaladsl.model.headers.`Set-Cookie`
-import akka.http.scaladsl.model.ws._
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
-import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueue}
+import akka.http.scaladsl.model.headers.`Set-Cookie`
+import akka.http.scaladsl.model.headers.Cookie
+import akka.http.scaladsl.model.ws._
 import akka.stream.{KillSwitch, KillSwitches, OverflowStrategy}
+import akka.stream.scaladsl.{Keep, Sink, Source, SourceQueue}
 import akka.util.ByteString
 import korolev.data._
+import korolev.server.internal.Cookies
 import korolev.state.{DeviceId, SessionId}
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
-import scala.util.matching.Regex
 import scala.util.{Failure, Success}
-import korolev.server.internal.Cookies
+import scala.util.matching.Regex
 import ujson._
 
 object KorolevConnection {
 
   def apply(host: String, port: Int, maybePath: Option[String], ssl: Boolean)(
-    receiver: ActorRef[FromServer])(implicit untypedSystem: ActorSystem): Behavior[ToServer] = {
+    receiver: ActorRef[FromServer]
+  )(implicit untypedSystem: ActorSystem): Behavior[ToServer] = {
 
-    val escapedPath = maybePath
-      .map { case s if !s.endsWith("/") => s + "/"; case s => s }
-      .map { case s if s.startsWith("/") => s.stripPrefix("/"); case s => s }
+    val escapedPath = maybePath.map { case s if !s.endsWith("/") => s + "/"; case s => s }.map {
+      case s if s.startsWith("/") => s.stripPrefix("/"); case s => s
+    }
       .getOrElse("/")
 
     Behaviors.setup[ToServer] { ctx =>
       val bufferedReceiver = {
-        def aux(stash: List[FromServer]): Behavior[FromServer] = {
+        def aux(stash: List[FromServer]): Behavior[FromServer] =
           Behaviors.receiveMessage[FromServer] {
             case FromServer.Closed =>
               aux(FromServer.Closed :: stash)
@@ -47,7 +48,6 @@ object KorolevConnection {
                 Behaviors.same
               }
           }
-        }
 
         ctx.spawnAnonymous(aux(Nil))
       }
@@ -58,18 +58,18 @@ object KorolevConnection {
           case HttpResponse(StatusCodes.OK, headers, entity, _) =>
             entity.dataBytes.runFold(ByteString(""))(_ ++ _) map { body =>
               for {
-                deviceId <- headers
-                  .collectFirst { case c: `Set-Cookie` if c.cookie.name == Cookies.DeviceId => c.cookie.value }
-                  .fold[Either[Error, String]](Left(Error.DeviceIdNotDefined))(Right(_))
+                deviceId <-
+                  headers.collectFirst { case c: `Set-Cookie` if c.cookie.name == Cookies.DeviceId => c.cookie.value }
+                    .fold[Either[Error, String]](Left(Error.DeviceIdNotDefined))(Right(_))
                 sessionId <- SessionIdExtractor
-                  .unapplySeq(body.utf8String)
-                  .flatMap(_.headOption)
-                  .fold[Either[Error, String]](Left(Error.SessionIdNotDefined))(Right(_))
+                               .unapplySeq(body.utf8String)
+                               .flatMap(_.headOption)
+                               .fold[Either[Error, String]](Left(Error.SessionIdNotDefined))(Right(_))
               } yield {
                 ConnectionInfo(deviceId, sessionId)
               }
             }
-          case resp@HttpResponse(code, _, _, _) =>
+          case resp @ HttpResponse(code, _, _, _) =>
             resp.discardEntityBytes()
             Future.successful(Left(Error.InvalidHttpStatusCodeForPage(code.intValue())))
         }
@@ -96,11 +96,11 @@ object KorolevConnection {
             }
           }
 
-          val protocol = if (ssl) "wss" else "ws"
-          val deviceId = connectionInfo.deviceId
+          val protocol  = if (ssl) "wss" else "ws"
+          val deviceId  = connectionInfo.deviceId
           val sessionId = connectionInfo.sessionId
-          val uri = s"$protocol://$host:$port${escapedPath}bridge/web-socket/$sessionId"
-          val request = WebSocketRequest(uri, extraHeaders = Seq(Cookie(Cookies.DeviceId, deviceId)))
+          val uri       = s"$protocol://$host:$port${escapedPath}bridge/web-socket/$sessionId"
+          val request   = WebSocketRequest(uri, extraHeaders = Seq(Cookie(Cookies.DeviceId, deviceId)))
 
           Source
             .queue[Message](1024, OverflowStrategy.backpressure)
@@ -111,7 +111,7 @@ object KorolevConnection {
         }
 
         upgradeResponse.map {
-          case ValidUpgrade(_, _) => Right(Connection(outgoing, killSwitch, closed))
+          case ValidUpgrade(_, _)                  => Right(Connection(outgoing, killSwitch, closed))
           case InvalidUpgradeResponse(response, _) => Left(Error.InvalidHttpStatusCodeForWS(response.status.intValue()))
         }
       }
@@ -124,44 +124,43 @@ object KorolevConnection {
               ctx.stop(ctx.self)
             }
             // Start receive messages to server
-            Behaviors.receiveMessage[Either[ToServer, Connection]] {
-              case Left(ToServer.Callback(tpe, Some(data))) =>
-                val json = write(ujson.Arr(tpe.code, data))
-                connection.outgoing.offer(TextMessage(json))
-                Behaviors.same
+            Behaviors
+              .receiveMessage[Either[ToServer, Connection]] {
+                case Left(ToServer.Callback(tpe, Some(data))) =>
+                  val json = write(ujson.Arr(tpe.code, data))
+                  connection.outgoing.offer(TextMessage(json))
+                  Behaviors.same
 
-              case Left(ToServer.Callback(tpe, None)) =>
-                val json = write(ujson.Arr(tpe.code))
-                connection.outgoing.offer(TextMessage(json))
-                Behaviors.same
+                case Left(ToServer.Callback(tpe, None)) =>
+                  val json = write(ujson.Arr(tpe.code))
+                  connection.outgoing.offer(TextMessage(json))
+                  Behaviors.same
 
-              case Left(ToServer.Close) =>
-                connection.killSwitch.shutdown()
-                Behaviors.same
-              case _ => Behaviors.ignore
-            }.receiveSignal {
-              case (_, Terminated(_)) ⇒
+                case Left(ToServer.Close) =>
+                  connection.killSwitch.shutdown()
+                  Behaviors.same
+                case _ => Behaviors.ignore
+              }
+              .receiveSignal { case (_, Terminated(_)) =>
                 // Close connection when actor was stopped
                 connection.killSwitch.shutdown()
                 Behaviors.stopped
-            }
+              }
           case _ =>
             Behaviors.ignore
         }
       }
 
-      openPage()
-        .flatMap {
-          case Right(connectionInfo) => establishConnection(connectionInfo)
-          case Left(error) => Future.successful(Left(error))
-        }
-        .onComplete {
-          case Success(Right(connection)) =>
-            bufferedReceiver ! FromServer.Connected(ctx.self)
-            worker ! Right(connection)
-          case Success(Left(error)) => bufferedReceiver ! FromServer.ErrorOccurred(error)
-          case Failure(e) => bufferedReceiver ! FromServer.ErrorOccurred(Error.ArbitraryThrowable(e))
-        }
+      openPage().flatMap {
+        case Right(connectionInfo) => establishConnection(connectionInfo)
+        case Left(error)           => Future.successful(Left(error))
+      }.onComplete {
+        case Success(Right(connection)) =>
+          bufferedReceiver ! FromServer.Connected(ctx.self)
+          worker ! Right(connection)
+        case Success(Left(error)) => bufferedReceiver ! FromServer.ErrorOccurred(error)
+        case Failure(e)           => bufferedReceiver ! FromServer.ErrorOccurred(Error.ArbitraryThrowable(e))
+      }
 
       Behaviors.receiveMessage[ToServer] { message =>
         worker ! Left(message)

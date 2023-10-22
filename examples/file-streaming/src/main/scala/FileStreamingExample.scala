@@ -20,8 +20,8 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Task, State, Any]
 
   import globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   val fileInput = elementId()
 

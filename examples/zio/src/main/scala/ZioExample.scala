@@ -20,8 +20,8 @@ object ZioExample extends ZIOAppDefault {
   val aInput = elementId()
   val bInput = elementId()
 
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   def renderForm(maybeResult: Option[Int]) = optimize {
     form(

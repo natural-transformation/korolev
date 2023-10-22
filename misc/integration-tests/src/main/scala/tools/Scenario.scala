@@ -1,11 +1,9 @@
 package tools
 
+import akka.actor.ActorSystem
 import java.net.URL
 import java.util.concurrent.Executors
-
-import akka.actor.ActorSystem
 import org.openqa.selenium.remote.RemoteWebDriver
-
 import scala.concurrent.{ExecutionContext, Future}
 
 case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorSystem) {
@@ -14,15 +12,15 @@ case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorS
     // Sauce labs give us 5 parallel sessions
     implicit val defaultExecutor = ExecutionContext.fromExecutorService(Executors.newWorkStealingPool(5))
 
-    val username = System.getenv("SAUCE_USERNAME")
+    val username  = System.getenv("SAUCE_USERNAME")
     val accessKey = System.getenv("SAUCE_ACCESS_KEY")
 
     val resultFutures = for (caps <- cases) yield {
       Future {
 
-        val capsDc = caps.desiredCapabilities
+        val capsDc       = caps.desiredCapabilities
         val scenarioName = s"'$name' for ${capsDc.getPlatform}/${capsDc.getBrowserName}/${capsDc.getVersion}"
-        val sb = new StringBuilder()
+        val sb           = new StringBuilder()
 
         // Show message immediately
         println(s"! ${Console.BLUE}$scenarioName started.${Console.RESET}")
@@ -30,7 +28,7 @@ case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorS
         sb.append(s"${Console.BOLD}Report: $scenarioName${Console.RESET}\n")
 
         val webDriver = {
-          val url = new URL(s"http://$username:$accessKey@ondemand.saucelabs.com:80/wd/hub")
+          val url                 = new URL(s"http://$username:$accessKey@ondemand.saucelabs.com:80/wd/hub")
           val desiredCapabilities = caps.desiredCapabilities
           desiredCapabilities.setCapability("tunnel-identifier", System.getenv("TRAVIS_JOB_NUMBER"))
           desiredCapabilities.setCapability("build", System.getenv("TRAVIS_BUILD_NUMBER"))
@@ -48,11 +46,12 @@ case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorS
               sb.append(s"- ${step.caption} 😓\n")
               runScenariosRec(skip = true, xs)
             case step :: xs =>
-              val result = try {
-                step.lambda(webDriver)
-              } catch {
-                case e: Throwable => StepResult.Error(e)
-              }
+              val result =
+                try {
+                  step.lambda(webDriver)
+                } catch {
+                  case e: Throwable => StepResult.Error(e)
+                }
               result match {
                 case StepResult.CowardlySkipped(reason) =>
                   sb.append(s"- ${step.caption} ($reason) 🤐\n")
@@ -76,10 +75,9 @@ case class Scenario(name: String, steps: Seq[Step])(implicit actorSystem: ActorS
 
         println(sb.mkString)
         isPassed
-      } recover {
-        case e: Throwable =>
-          logger.error(s"In $name with ${caps.desiredCapabilities}", e)
-          false
+      } recover { case e: Throwable =>
+        logger.error(s"In $name with ${caps.desiredCapabilities}", e)
+        false
       }
     }
 

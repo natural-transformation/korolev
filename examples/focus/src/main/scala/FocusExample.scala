@@ -10,8 +10,8 @@ object FocusExample extends SimpleAkkaHttpKorolevApp {
   val globalContext = Context[Future, Boolean, Any]
 
   import globalContext._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   // Handler to input
   val inputId = elementId()

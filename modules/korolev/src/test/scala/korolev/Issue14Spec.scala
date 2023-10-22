@@ -82,8 +82,8 @@ object Issue14Spec {
   val context = Context[Future, Issue14Spec.S, Any]
 
   import context._
-  import levsha.dsl.html._
   import levsha.dsl._
+  import levsha.dsl.html._
 
   def render(firstEvent: Event, secondEvent: Event): Render = {
     case "firstState" =>
