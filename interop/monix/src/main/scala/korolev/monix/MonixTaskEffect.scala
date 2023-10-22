@@ -16,11 +16,10 @@
 
 package korolev.monix
 
-import korolev.effect.Effect
 import _root_.monix.eval.Task
 import _root_.monix.execution.Scheduler
-
-import scala.concurrent.{ExecutionContext, Future, blocking => futureBlocking}
+import korolev.effect.Effect
+import scala.concurrent.{blocking => futureBlocking, ExecutionContext, Future}
 import scala.util.Try
 
 class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
@@ -49,13 +48,11 @@ class MonixTaskEffect(implicit scheduler: Scheduler) extends Effect[Task] {
     Task.fromTry(value)
 
   def start[A](m: => Task[A])(implicit ec: ExecutionContext): Task[Effect.Fiber[Task, A]] =
-    m.executeOn(Scheduler(ec))
-      .start
-      .map { fiber =>
-        new Effect.Fiber[Task, A] {
-          def join(): Task[A] = fiber.join
-        }
+    m.executeOn(Scheduler(ec)).start.map { fiber =>
+      new Effect.Fiber[Task, A] {
+        def join(): Task[A] = fiber.join
       }
+    }
 
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): Task[A] =
     Task.async(cb)

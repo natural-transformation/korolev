@@ -46,7 +46,7 @@ Korolev uses https://github.com/fomkin/levsha[Levsha] as DSL (domain specific la
 [source,scala]
 -----------------------------------
 import levsha.dsl._
-import html._
+import levsha.dsl.html._
 
 div(
   backgroundColor @= "yellow",
@@ -268,7 +268,7 @@ val MyComponent = Component[Future, ComponentState, ComponentParameters, EventTy
 
   import context._
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
 
   div(
     parameters.toString,
@@ -289,7 +289,7 @@ object MyComponent extends Component[Future, ComponentState, ComponentParameters
 
   import context._
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
 
   def render(parameters: ComponentParameters, state: ComponentState): Node = {
     div(

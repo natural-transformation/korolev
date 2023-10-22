@@ -4,17 +4,16 @@ import korolev.akka.*
 import korolev.server.*
 import korolev.state.javaSerialization.*
 import korolev.util.Lens
-
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 
 object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
 
   val context = Context[Future, ViewState, Any]
 
   import context._
+  import levsha.dsl.html._
   import levsha.dsl._
-  import html._
 
   final private val blogLens = Lens[ViewState, Blog](
     read = { case ViewState(_, s: Blog) => s },
@@ -24,10 +23,10 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
   final private val blogView = new BlogView(context.scope(blogLens))
 
   val service: AkkaHttpService = akkaHttpService {
-    KorolevServiceConfig[Future, ViewState, Any] (
+    KorolevServiceConfig[Future, ViewState, Any](
       stateLoader = StateLoader.default(ViewState("My blog", Blog.default)),
       document = { state =>
-        val isBlog = state.tab.isInstanceOf[Blog]
+        val isBlog  = state.tab.isInstanceOf[Blog]
         val isAbout = state.tab.isInstanceOf[About]
 
         optimize {
@@ -55,7 +54,7 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
               div(
                 marginTop @= "20px",
                 state.tab match {
-                  case blog: Blog => blogView(blog)
+                  case blog: Blog   => blogView(blog)
                   case about: About => p(about.text)
                 }
               )
@@ -66,4 +65,3 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
     )
   }
 }
-

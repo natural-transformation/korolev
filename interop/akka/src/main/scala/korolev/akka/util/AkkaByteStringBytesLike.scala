@@ -1,10 +1,9 @@
 package korolev.akka.util
 
 import akka.util.ByteString
-import korolev.data.BytesLike
-
 import java.nio.ByteBuffer
 import java.nio.charset.{Charset, StandardCharsets}
+import korolev.data.BytesLike
 
 final class AkkaByteStringBytesLike extends BytesLike[ByteString] {
 

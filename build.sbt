@@ -1,24 +1,24 @@
 import xerial.sbt.Sonatype._
 
 val scala2_13Version = "2.13.12"
-val scala3Version = "3.3.1"
+val scala3Version    = "3.3.1"
 
 val levshaVersion = "1.3.0"
 
-val akkaVersion = "2.6.19"
+val akkaVersion     = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
 val circeVersion = "0.14.1"
-val ce2Version = "2.5.5"
-val ce3Version = "3.3.12"
+val ce2Version   = "2.5.5"
+val ce3Version   = "3.3.12"
 
-val zioVersion = "1.0.15"
-val zio2Version = "2.0.0"
+val zioVersion     = "1.0.15"
+val zio2Version    = "2.0.0"
 val zioHttpVersion = "3.0.0-RC2"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
-val monixVersion = "3.4.1"
+val monixVersion  = "3.4.1"
 val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
@@ -32,41 +32,41 @@ val crossVersionSettings = Seq(
 )
 
 val dontPublishSettings = Seq(
-  publish := {},
-  publishTo := unusedRepo,
+  publish         := {},
+  publishTo       := unusedRepo,
   publishArtifact := false,
-  headerLicense := None
+  headerLicense   := None
 )
 
 val publishSettings = Seq(
-  publishMavenStyle := true,
+  publishMavenStyle      := true,
   Test / publishArtifact := false,
-  pomIncludeRepository := { _ => false },
-  publishTo := sonatypePublishTo.value,
-  sonatypeProfileName := "org.fomkin",
+  pomIncludeRepository   := { _ => false },
+  publishTo              := sonatypePublishTo.value,
+  sonatypeProfileName    := "org.fomkin",
   sonatypeProjectHosting := Some(GitHubHosting("fomkin", "korolev", "Aleksey Fomkin", "aleksey.fomkin@gmail.com")),
-  headerLicense := Some(HeaderLicense.ALv2("2017-2020", "Aleksey Fomkin")),
-  licenses := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
+  headerLicense          := Some(HeaderLicense.ALv2("2017-2020", "Aleksey Fomkin")),
+  licenses               := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 )
 
 val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
-  organization := "org.fomkin",
-  scalaVersion := scala3Version,
-  version := "1.16.0-SNAPSHOT",
+  organization       := "org.fomkin",
+  scalaVersion       := scala3Version,
+  version            := "1.16.0-SNAPSHOT",
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
     CrossVersion.partialVersion(scalaVersion.value) match {
       case Some((2, _)) =>
         Seq(
-          compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.1"),
-          compilerPlugin("org.typelevel" %% "kind-projector" % "0.13.2" cross CrossVersion.full),
+          compilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
+          compilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full)
         )
       case _ => Seq()
     }
   },
   libraryDependencies ++= Seq(
-    "org.scalatest" %% "scalatest" % "3.2.9" % Test,
+    "org.scalatest"     %% "scalatest"       % "3.2.9"   % Test,
     "org.scalatestplus" %% "scalacheck-1-15" % "3.2.9.0" % Test
   ),
   //javaOptions in Test += "-XX:-OmitStackTraceInFastThrow",
@@ -82,7 +82,7 @@ val commonSettings = publishSettings ++ Seq(
           "-Xlint",
           "-Ywarn-numeric-widen",
           "-Ywarn-value-discard",
-          "-Xsource:3",
+          "-Xsource:3"
           //"-P:kind-projector:underscore-placeholders",
         )
       case _ =>
@@ -102,10 +102,10 @@ val exampleSettings = commonSettings ++ dontPublishSettings ++ Seq(
   libraryDependencies += "org.slf4j" % "slf4j-simple" % "2.0.9"
 )
 
-val modules = file("modules")
-val interop = file("interop")
+val modules  = file("modules")
+val interop  = file("interop")
 val examples = file("examples")
-val misc = file("misc")
+val misc     = file("misc")
 
 lazy val bytes = project
   .in(modules / "bytes")
@@ -132,7 +132,7 @@ lazy val web = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    description := "Collection of data classes for Web Standards support",
+    description    := "Collection of data classes for Web Standards support",
     normalizedName := "korolev-web"
   )
 
@@ -144,9 +144,9 @@ lazy val http = project
   .settings(
     normalizedName := "korolev-http",
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-stream" % akkaVersion % Test).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion % Test).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion     % Test).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-stream"      % akkaVersion     % Test).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-http"        % akkaHttpVersion % Test).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(effect, web)
@@ -157,7 +157,7 @@ lazy val webDsl = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    description := "Convenient DSL for web purposes",
+    description    := "Convenient DSL for web purposes",
     normalizedName := "korolev-web-dsl"
   )
   .dependsOn(effect, web)
@@ -170,17 +170,15 @@ lazy val korolev = project
   .settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "com.github.fomkin" %% "levsha-core" % levshaVersion,
+      "com.github.fomkin" %% "levsha-core"   % levshaVersion,
       "com.github.fomkin" %% "levsha-events" % levshaVersion
     ),
-    Compile / resourceGenerators += Def
-      .task {
-        val source = baseDirectory.value / "src" / "main" / "es6"
-        val target = (Compile / resourceManaged).value / "static"
-        val log = streams.value.log
-        JsUtils.assembleJs(source, target, log)
-      }
-      .taskValue
+    Compile / resourceGenerators += Def.task {
+      val source = baseDirectory.value / "src" / "main" / "es6"
+      val target = (Compile / resourceManaged).value / "static"
+      val log    = streams.value.log
+      JsUtils.assembleJs(source, target, log)
+    }.taskValue
   )
   .dependsOn(effect, web)
 
@@ -200,7 +198,7 @@ lazy val testkit = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-testkit",
+    normalizedName                         := "korolev-testkit",
     libraryDependencies += "org.graalvm.js" % "js" % "20.3.0"
   )
   .dependsOn(korolev)
@@ -215,9 +213,9 @@ lazy val akka = project
   .settings(
     normalizedName := "korolev-akka",
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-actor" % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-actor"  % akkaVersion).cross(CrossVersion.for3Use2_13),
       ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13)
+      ("com.typesafe.akka" %% "akka-http"   % akkaHttpVersion).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)
@@ -228,43 +226,43 @@ lazy val zioHttp = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-zio-http",
+    normalizedName                   := "korolev-zio-http",
     libraryDependencies += "dev.zio" %% "zio-http" % zioHttpVersion
   )
   .dependsOn(korolev, web, zio2, zio2Streams)
 
-lazy val slf4j = project.
-  in(interop / "slf4j").
-  enablePlugins(GitVersioning).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-slf4j",
+lazy val slf4j = project
+  .in(interop / "slf4j")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName                    := "korolev-slf4j",
     libraryDependencies += "org.slf4j" % "slf4j-api" % "1.7.25"
-  ).
-  dependsOn(effect)
+  )
+  .dependsOn(effect)
 
-lazy val ce2 = project.
-  in(interop / "ce2").
-  enablePlugins(GitVersioning).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-ce2",
+lazy val ce2 = project
+  .in(interop / "ce2")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName                         := "korolev-ce2",
     libraryDependencies += "org.typelevel" %% "cats-effect" % ce2Version
-  ).
-  dependsOn(effect)
+  )
+  .dependsOn(effect)
 
-lazy val ce3 = project.
-  in(interop / "ce3").
-  enablePlugins(GitVersioning).
-  settings(crossVersionSettings).
-  settings(commonSettings: _*).
-  settings(
-    normalizedName := "korolev-ce3",
+lazy val ce3 = project
+  .in(interop / "ce3")
+  .enablePlugins(GitVersioning)
+  .settings(crossVersionSettings)
+  .settings(commonSettings: _*)
+  .settings(
+    normalizedName                         := "korolev-ce3",
     libraryDependencies += "org.typelevel" %% "cats-effect" % ce3Version
-  ).
-  dependsOn(effect)
+  )
+  .dependsOn(effect)
 
 lazy val monix = project
   .in(interop / "monix")
@@ -274,7 +272,7 @@ lazy val monix = project
   .settings(
     normalizedName := "korolev-monix",
     libraryDependencies ++= List(
-      "io.monix" %% "monix-eval" % monixVersion,
+      "io.monix" %% "monix-eval"      % monixVersion,
       "io.monix" %% "monix-execution" % monixVersion
     )
   )
@@ -286,7 +284,7 @@ lazy val zio = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-zio",
+    normalizedName                   := "korolev-zio",
     libraryDependencies += "dev.zio" %% "zio" % zioVersion
   )
   .dependsOn(effect)
@@ -299,9 +297,9 @@ lazy val zio2 = project
   .settings(
     normalizedName := "korolev-zio2",
     libraryDependencies ++= Seq(
-      "dev.zio" %% "zio" % zio2Version,
-      "dev.zio" %% "zio-test" % zio2Version % Test,
-      "dev.zio" %% "zio-test-sbt" % zio2Version % Test,
+      "dev.zio" %% "zio"               % zio2Version,
+      "dev.zio" %% "zio-test"          % zio2Version % Test,
+      "dev.zio" %% "zio-test-sbt"      % zio2Version % Test,
       "dev.zio" %% "zio-test-magnolia" % zio2Version % Test
     ),
     testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
@@ -314,7 +312,7 @@ lazy val zioStreams = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-zio-streams",
+    normalizedName                   := "korolev-zio-streams",
     libraryDependencies += "dev.zio" %% "zio-streams" % zioVersion
   )
   .dependsOn(effect, zio)
@@ -325,7 +323,7 @@ lazy val zio2Streams = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-zio2-streams",
+    normalizedName                   := "korolev-zio2-streams",
     libraryDependencies += "dev.zio" %% "zio-streams" % zio2Version
   )
   .dependsOn(effect, zio2)
@@ -336,7 +334,7 @@ lazy val fs2ce2 = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-fs2-ce2",
+    normalizedName                  := "korolev-fs2-ce2",
     libraryDependencies += "co.fs2" %% "fs2-core" % fs2ce2Version
   )
   .dependsOn(effect, ce2)
@@ -347,7 +345,7 @@ lazy val fs2ce3 = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-fs2-ce3",
+    normalizedName                  := "korolev-fs2-ce3",
     libraryDependencies += "co.fs2" %% "fs2-core" % fs2ce3Version
   )
   .dependsOn(effect, ce3)
@@ -358,11 +356,10 @@ lazy val scodec = project
   .settings(crossVersionSettings)
   .settings(commonSettings: _*)
   .settings(
-    normalizedName := "korolev-scodec",
+    normalizedName                      := "korolev-scodec",
     libraryDependencies += "org.scodec" %% "scodec-bits" % scodecVersion
   )
   .dependsOn(bytes)
-
 
 // Examples
 
@@ -516,15 +513,15 @@ lazy val `integration-tests` = project
   .disablePlugins(HeaderPlugin)
   .settings(crossVersionSettings)
   .settings(commonSettings)
-  .settings(dontPublishSettings:_*)
+  .settings(dontPublishSettings: _*)
   .settings(
     run / fork := true,
     libraryDependencies ++= Seq(
-      "org.slf4j" % "slf4j-simple" % "2.0.9",
+      "org.slf4j"               % "slf4j-simple"  % "2.0.9",
       "org.seleniumhq.selenium" % "selenium-java" % "4.12.1",
-      "io.circe" %% "circe-core" % circeVersion,
-      "io.circe" %% "circe-generic" % circeVersion,
-      "io.circe" %% "circe-parser" % circeVersion
+      "io.circe"               %% "circe-core"    % circeVersion,
+      "io.circe"               %% "circe-generic" % circeVersion,
+      "io.circe"               %% "circe-parser"  % circeVersion
     )
   )
   .dependsOn(slf4j)
@@ -535,15 +532,15 @@ lazy val `performance-benchmark` = project
   .disablePlugins(HeaderPlugin)
   .settings(crossVersionSettings)
   .settings(commonSettings)
-  .settings(dontPublishSettings:_*)
+  .settings(dontPublishSettings: _*)
   .settings(
     run / fork := true,
     libraryDependencies ++= Seq(
-      ("com.typesafe.akka" %% "akka-http" % akkaHttpVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-stream" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      ("com.typesafe.akka" %% "akka-actor"  % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-http"        % akkaHttpVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-stream"      % akkaVersion).cross(CrossVersion.for3Use2_13),
+      ("com.typesafe.akka" %% "akka-actor"       % akkaVersion).cross(CrossVersion.for3Use2_13),
       ("com.typesafe.akka" %% "akka-actor-typed" % akkaVersion).cross(CrossVersion.for3Use2_13),
-      "com.lihaoyi" %% "ujson" % "1.3.15"
+      "com.lihaoyi"        %% "ujson"            % "1.3.15"
     )
   )
   .dependsOn(korolev)
@@ -552,21 +549,48 @@ lazy val root = project
   .in(file("."))
   .disablePlugins(HeaderPlugin)
   .settings(crossVersionSettings)
-  .settings(dontPublishSettings:_*)
+  .settings(dontPublishSettings: _*)
   .settings(name := "Korolev Project")
   .aggregate(
-    korolev, effect, web, http, standalone, testkit,
-    bytes, webDsl,
+    korolev,
+    effect,
+    web,
+    http,
+    standalone,
+    testkit,
+    bytes,
+    webDsl,
     // Interop
-    akka, ce2, ce3, monix, zio, zioStreams, zio2, zio2Streams, slf4j,
-    scodec, fs2ce2, fs2ce3, zioHttp,
+    akka,
+    ce2,
+    ce3,
+    monix,
+    zio,
+    zioStreams,
+    zio2,
+    zio2Streams,
+    slf4j,
+    scodec,
+    fs2ce2,
+    fs2ce3,
+    zioHttp,
     // Examples
-    simpleExample, routingExample, gameOfLifeExample,
-    formDataExample, `file-streaming-example`, delayExample,
-    focusExample, webComponentExample, componentExample,
-    akkaHttpExample, contextScopeExample, eventDataExample,
-    extensionExample, zioExample, monixExample,
-    catsEffectExample, evalJsExample,
+    simpleExample,
+    routingExample,
+    gameOfLifeExample,
+    formDataExample,
+    `file-streaming-example`,
+    delayExample,
+    focusExample,
+    webComponentExample,
+    componentExample,
+    akkaHttpExample,
+    contextScopeExample,
+    eventDataExample,
+    extensionExample,
+    zioExample,
+    monixExample,
+    catsEffectExample,
+    evalJsExample,
     zioHttpExample
   )
-

@@ -18,13 +18,12 @@ package korolev.internal
 
 import java.io.{File, RandomAccessFile}
 import java.nio.ByteBuffer
-
 import levsha.impl.DiffRenderContext
 
 private[korolev] object DevMode {
 
-  private val DevModeKey = "korolev.dev"
-  private val DevModeDirectoryKey = "korolev.dev.directory"
+  private val DevModeKey              = "korolev.dev"
+  private val DevModeDirectoryKey     = "korolev.dev.directory"
   private val DevModeDefaultDirectory = "target/korolev/"
 
   class ForRenderContext(identifier: String) {
@@ -67,12 +66,14 @@ private[korolev] object DevMode {
     }
   }
 
-  val isActive = sys.env.get(DevModeKey)
+  val isActive = sys.env
+    .get(DevModeKey)
     .orElse(sys.props.get(DevModeKey))
     .fold(false)(_ == "true")
 
   lazy val workDirectory = {
-    val directoryPath = sys.env.get(DevModeDirectoryKey)
+    val directoryPath = sys.env
+      .get(DevModeDirectoryKey)
       .orElse(sys.props.get(DevModeDirectoryKey))
       .getOrElse(DevModeDefaultDirectory)
 

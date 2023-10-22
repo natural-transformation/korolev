@@ -16,7 +16,7 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.{Stream, Effect}
+import korolev.effect.{Effect, Stream}
 import korolev.server.HttpResponse
 import korolev.server.internal.HttpResponse
 import korolev.web.Response

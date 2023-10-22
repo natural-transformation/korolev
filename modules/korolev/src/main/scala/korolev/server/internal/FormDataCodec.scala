@@ -18,9 +18,7 @@ package korolev.server.internal
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import korolev.web.FormData
-
 import scala.annotation.tailrec
 
 private[korolev] final class FormDataCodec(maxPartSize: Int) {
@@ -28,25 +26,24 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
   import FormDataCodec._
 
   private val threadLocalBuffer = new ThreadLocal[ByteBuffer] {
-    override def initialValue(): ByteBuffer = {
+    override def initialValue(): ByteBuffer =
       ByteBuffer.allocate(maxPartSize)
-    }
   }
 
   def decode(source: ByteBuffer, boundary: String): FormData = {
 
     val boundaryWithBreaks = s"\n--$boundary\n"
-    val end = s"\n--$boundary--\n"
-    val buffer = threadLocalBuffer.get()
+    val end                = s"\n--$boundary--\n"
+    val buffer             = threadLocalBuffer.get()
 
     buffer.clear()
 
     // Check the delimiter is reached
     def checkDelimiter(delimiter: String): Boolean = {
       val d = delimiter.getBytes
-      @tailrec def aux(pos: Int, startPos: Int): Boolean = {
+      @tailrec def aux(pos: Int, startPos: Int): Boolean =
         if (pos < d.length) {
-          if(source.position() == source.limit()) {
+          if (source.position() == source.limit()) {
             true
           } else {
             val b = source.get()
@@ -58,16 +55,13 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
             }
           }
         } else true
-      }
       aux(0, source.position)
     }
 
     type Entries = List[FormData.Entry]
     type Headers = List[(String, String)]
 
-    def loop(entries: Entries,
-             headers: Headers,
-             state: DecoderState): Entries = {
+    def loop(entries: Entries, headers: Headers, state: DecoderState): Entries = {
 
       def updateEntries() = {
         val content = {
@@ -126,5 +120,5 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
 private[korolev] object FormDataCodec {
   private sealed trait DecoderState
   private case object Buffering extends DecoderState
-  private case object Headers extends DecoderState
+  private case object Headers   extends DecoderState
 }

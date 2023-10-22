@@ -1,31 +1,32 @@
 import korolev._
-import korolev.server._
 import korolev.akka._
-import scala.concurrent.ExecutionContext.Implicits.global
+import korolev.server._
 import korolev.state.javaSerialization._
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object SimpleExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
+  import levsha.dsl.html._
   import levsha.dsl._
-  import html._
 
   // Handler to input
-  val inputId = elementId()
+  val inputId     = elementId()
   val editInputId = elementId()
 
   val service = akkaHttpService {
-    KorolevServiceConfig [Future, State, Any] (
+    KorolevServiceConfig[Future, State, Any](
       stateLoader = StateLoader.default(State()),
-      document = state => optimize {
-        Html(
-          body(
-            div("Super TODO tracker"),
-            div(height @= "250px", overflow @= "scroll",
-              (state.todos zipWithIndex) map {
-                case (todo, i) =>
+      document = state =>
+        optimize {
+          Html(
+            body(
+              div("Super TODO tracker"),
+              div(
+                height @= "250px",
+                overflow @= "scroll",
+                (state.todos zipWithIndex) map { case (todo, i) =>
                   div(
                     input(
                       `type` := "checkbox",
@@ -47,13 +48,13 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                           editInputId,
                           display @= "inline-block",
                           `type` := "text",
-                          value := todo.text
+                          value  := todo.text
                         ),
                         button(display @= "inline-block", "Save"),
                         event("submit") { access =>
                           access.property(editInputId, "value") flatMap { value =>
                             access.transition { s =>
-                              val updatedTodo = s.todos(i).copy(text = value)
+                              val updatedTodo  = s.todos(i).copy(text = value)
                               val updatedTodos = s.todos.updated(i, updatedTodo)
                               s.copy(todos = updatedTodos, edit = None)
                             }
@@ -70,33 +71,33 @@ object SimpleExample extends SimpleAkkaHttpKorolevApp {
                       )
                     }
                   )
-              }
-            ),
-            form(
-              // Generate AddTodo action when Add' button clicked
-              event("submit") { access =>
-                val prop = access.property(inputId)
-                prop.get("value") flatMap { value =>
-                  prop.set("value", "") flatMap { _ =>
-                    val todo = State.Todo(value, done = false)
-                    access.transition(s => s.copy(todos = s.todos :+ todo))
-                  }
                 }
-              },
-              input(
-                when(state.edit.nonEmpty)(disabled),
-                inputId,
-                `type` := "text",
-                placeholder := "What should be done?"
               ),
-              button(
-                when(state.edit.nonEmpty)(disabled),
-                "Add todo"
+              form(
+                // Generate AddTodo action when Add' button clicked
+                event("submit") { access =>
+                  val prop = access.property(inputId)
+                  prop.get("value") flatMap { value =>
+                    prop.set("value", "") flatMap { _ =>
+                      val todo = State.Todo(value, done = false)
+                      access.transition(s => s.copy(todos = s.todos :+ todo))
+                    }
+                  }
+                },
+                input(
+                  when(state.edit.nonEmpty)(disabled),
+                  inputId,
+                  `type`      := "text",
+                  placeholder := "What should be done?"
+                ),
+                button(
+                  when(state.edit.nonEmpty)(disabled),
+                  "Add todo"
+                )
               )
             )
           )
-        )
-      }
+        }
     )
   }
 }
@@ -110,4 +111,3 @@ object State {
   val globalContext = Context[Future, State, Any]
   case class Todo(text: String, done: Boolean)
 }
-

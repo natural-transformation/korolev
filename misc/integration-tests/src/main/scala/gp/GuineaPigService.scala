@@ -40,7 +40,7 @@ object GuineaPigService {
 
   import State.globalContext._
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
   
   val logger = LoggerFactory.getLogger("GuineaPig")
 

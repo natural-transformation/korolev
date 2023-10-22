@@ -2,11 +2,10 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import cats.effect.IO
 import korolev.Context
-import korolev.akka.{AkkaHttpServerConfig, akkaHttpService}
+import korolev.akka.{akkaHttpService, AkkaHttpServerConfig}
 import korolev.cats._
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 
 object CatsIOExample extends App {
@@ -18,11 +17,11 @@ object CatsIOExample extends App {
   }
 
   import applicationContext._
+  import levsha.dsl.html._
   import levsha.dsl._
-  import html._
 
   // Handler to input
-  private val inputId = elementId()
+  private val inputId     = elementId()
   private val editInputId = elementId()
 
   val config = KorolevServiceConfig[IO, State, Any](
@@ -31,53 +30,54 @@ object CatsIOExample extends App {
       Html(
         body(
           div("Super TODO tracker"),
-          div(height @= "250px", overflow @= "scroll",
-            (state.todos zipWithIndex) map {
-              case (todo, i) =>
-                div(
-                  input(
-                    `type` := "checkbox",
-                    if (state.edit.nonEmpty) disabled else void,
-                    if (todo.done) checked else void,
-                    // Generate transition when clicking checkboxes
-                    event("click") { access =>
-                      access.transition { s =>
-                        val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
-                        s.copy(todos = updated)
-                      }
+          div(
+            height @= "250px",
+            overflow @= "scroll",
+            (state.todos zipWithIndex) map { case (todo, i) =>
+              div(
+                input(
+                  `type` := "checkbox",
+                  if (state.edit.nonEmpty) disabled else void,
+                  if (todo.done) checked else void,
+                  // Generate transition when clicking checkboxes
+                  event("click") { access =>
+                    access.transition { s =>
+                      val updated = s.todos.updated(i, s.todos(i).copy(done = !todo.done))
+                      s.copy(todos = updated)
                     }
-                  ),
-                  if (state.edit.contains(i)) {
-                    form(
-                      marginBottom @= "-10px",
+                  }
+                ),
+                if (state.edit.contains(i)) {
+                  form(
+                    marginBottom @= "-10px",
+                    display @= "inline-block",
+                    input(
+                      editInputId,
                       display @= "inline-block",
-                      input(
-                        editInputId,
-                        display @= "inline-block",
-                        `type` := "text",
-                        value := todo.text
-                      ),
-                      button(display @= "inline-block", "Save"),
-                      event("submit") { access =>
-                        access.valueOf(editInputId) flatMap { value =>
-                          access.transition { s =>
-                            val updatedTodo = s.todos(i).copy(text = value)
-                            val updatedTodos = s.todos.updated(i, updatedTodo)
-                            s.copy(todos = updatedTodos, edit = None)
-                          }
+                      `type` := "text",
+                      value  := todo.text
+                    ),
+                    button(display @= "inline-block", "Save"),
+                    event("submit") { access =>
+                      access.valueOf(editInputId) flatMap { value =>
+                        access.transition { s =>
+                          val updatedTodo  = s.todos(i).copy(text = value)
+                          val updatedTodos = s.todos.updated(i, updatedTodo)
+                          s.copy(todos = updatedTodos, edit = None)
                         }
                       }
-                    )
-                  } else {
-                    span(
-                      if (todo.done) textDecoration @= "line-through" else void,
-                      todo.text,
-                      event("dblclick") { access =>
-                        access.transition(_.copy(edit = Some(i)))
-                      }
-                    )
-                  }
-                )
+                    }
+                  )
+                } else {
+                  span(
+                    if (todo.done) textDecoration @= "line-through" else void,
+                    todo.text,
+                    event("dblclick") { access =>
+                      access.transition(_.copy(edit = Some(i)))
+                    }
+                  )
+                }
+              )
             }
           ),
           form(
@@ -100,7 +100,7 @@ object CatsIOExample extends App {
             input(
               if (state.edit.nonEmpty) disabled else void,
               inputId,
-              `type` := "text",
+              `type`      := "text",
               placeholder := "What should be done?"
             ),
             button(

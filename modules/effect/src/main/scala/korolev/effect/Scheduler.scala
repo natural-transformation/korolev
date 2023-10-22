@@ -19,7 +19,6 @@ package korolev.effect
 import java.util.{Timer, TimerTask}
 import korolev.effect.Effect.Promise
 import korolev.effect.syntax._
-
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.FiniteDuration
@@ -32,11 +31,12 @@ final class Scheduler[F[_]: Effect] {
 
   def schedule(delay: FiniteDuration): F[Stream[F, Unit]] = Effect[F].delay {
     new Stream[F, Unit] {
-      var canceled = false
+      var canceled                                    = false
       var cb: Either[Throwable, Option[Unit]] => Unit = _
-      var task: TimerTask = _
+      var task: TimerTask                             = _
       def pull(): F[Option[Unit]] = Effect[F].promise { cb =>
-        if (canceled) cb(Right(None)) else {
+        if (canceled) cb(Right(None))
+        else {
           this.cb = cb
           this.task = new TimerTask { def run(): Unit = cb(Right(Some(()))) }
           timer.schedule(task, delay.toMillis)
@@ -65,15 +65,14 @@ final class Scheduler[F[_]: Effect] {
     new JobHandler[F, T] {
 
       @volatile private var completed: Either[Throwable, T] = _
-      @volatile private var promise: Promise[T] = _
+      @volatile private var promise: Promise[T]             = _
 
       private val task = new TimerTask {
-        def run(): Unit = {
+        def run(): Unit =
           job.runAsync { errorOrResult =>
             if (promise != null) promise(errorOrResult)
             else completed = errorOrResult
           }
-        }
       }
 
       def result: F[T] = Effect[F].promise { cb =>

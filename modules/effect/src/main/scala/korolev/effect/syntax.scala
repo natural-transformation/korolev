@@ -29,22 +29,22 @@ object syntax {
     def map[B](f: A => B): F[B] = Effect[F].map(effect)(f)
 
     /**
-      * Alias for {{{.flatMap(_ => ())}}}
-      */
+     * Alias for {{{.flatMap(_ => ())}}}
+     */
     def unit: F[Unit] = Effect[F].map(effect)(_ => ())
 
     def flatMap[B](f: A => F[B]): F[B] = Effect[F].flatMap(effect)(f)
 
     /**
-      * Alias for [[after]]
-      */
+     * Alias for [[after]]
+     */
     def *>[B](fb: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => fb)
 
     def as[B](b: B): F[B] = Effect[F].map(effect)(_ => b)
 
     /**
-      * Do 'm' right after [[effect]]
-      */
+     * Do 'm' right after [[effect]]
+     */
     def after[B](m: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => m)
 
     def recover[AA >: A](f: PartialFunction[Throwable, AA]): F[AA] = Effect[F].recover[A, AA](effect)(f)
@@ -64,18 +64,18 @@ object syntax {
     def runAsyncSuccess(f: A => Unit)(implicit er: Reporter): Unit =
       Effect[F].runAsync(effect) {
         case Right(x) => f(x)
-        case Left(e) => er.error("Unhandled error", e)
+        case Left(e)  => er.error("Unhandled error", e)
       }
     def runSyncForget(implicit reporter: Reporter): Unit =
       Effect[F].run(effect) match {
-        case Left(value) => reporter.error("Unhandled error", value)
+        case Left(value)  => reporter.error("Unhandled error", value)
         case Right(value) => ()
       }
 
     def runAsyncForget(implicit er: Reporter): Unit =
       Effect[F].runAsync(effect) {
         case Right(_) => // do nothing
-        case Left(e) => er.error("Unhandled error", e)
+        case Left(e)  => er.error("Unhandled error", e)
       }
   }
 }

@@ -24,7 +24,6 @@ import korolev.akka.util.{AkkaByteStringBytesLike, KorolevStreamPublisher, Korol
 import korolev.data.BytesLike
 import korolev.effect.{Effect, Stream}
 import org.reactivestreams.Publisher
-
 import scala.concurrent.ExecutionContext
 
 object instances {
@@ -49,16 +48,18 @@ object instances {
   implicit final class KorolevStreamsOps[F[_]: Effect, T](stream: Stream[F, T]) {
 
     /**
-      * Converts korolev [[korolev.effect.Stream]] to [[Publisher]].
-      *
-      * If `fanout` is `true`, the `Publisher` will support multiple `Subscriber`s and
-      * the size of the `inputBuffer` configured for this operator becomes the maximum number of elements that
-      * the fastest [[org.reactivestreams.Subscriber]] can be ahead of the slowest one before slowing
-      * the processing down due to back pressure.
-      *
-      * If `fanout` is `false` then the `Publisher` will only support a single `Subscriber` and
-      * reject any additional `Subscriber`s with [[korolev.akka.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException]].
-      */
+     * Converts korolev [[korolev.effect.Stream]] to [[Publisher]].
+     *
+     * If `fanout` is `true`, the `Publisher` will support multiple
+     * `Subscriber`s and the size of the `inputBuffer` configured for this
+     * operator becomes the maximum number of elements that the fastest
+     * [[org.reactivestreams.Subscriber]] can be ahead of the slowest one before
+     * slowing the processing down due to back pressure.
+     *
+     * If `fanout` is `false` then the `Publisher` will only support a single
+     * `Subscriber` and reject any additional `Subscriber`s with
+     * [[korolev.akka.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException]].
+     */
     def asPublisher(fanout: Boolean = false)(implicit ec: ExecutionContext): Publisher[T] =
       new KorolevStreamPublisher(stream, fanout)
 

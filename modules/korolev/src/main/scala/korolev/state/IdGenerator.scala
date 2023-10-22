@@ -17,7 +17,6 @@
 package korolev.state
 
 import java.security.SecureRandom
-
 import korolev.effect.Effect
 
 trait IdGenerator[F[_]] {
@@ -27,15 +26,16 @@ trait IdGenerator[F[_]] {
 
 object IdGenerator {
 
-  val DefaultDeviceIdLength = 16
+  val DefaultDeviceIdLength  = 16
   val DefaultSessionIdLength = 8
 
-  def default[F[_]](deviceIdLength: Int = DefaultDeviceIdLength,
-                    sessionIdLength: Int = DefaultSessionIdLength): IdGenerator[F] =
+  def default[F[_]](
+    deviceIdLength: Int = DefaultDeviceIdLength,
+    sessionIdLength: Int = DefaultSessionIdLength
+  ): IdGenerator[F] =
     new DefaultIdGenerator[F](deviceIdLength, sessionIdLength)
 
-  private class DefaultIdGenerator[F[_]](deviceIdLength: Int,
-                                          sessionIdLength: Int) extends IdGenerator[F] {
+  private class DefaultIdGenerator[F[_]](deviceIdLength: Int, sessionIdLength: Int) extends IdGenerator[F] {
     def generateDeviceId()(implicit F: Effect[F]): F[DeviceId] =
       Effect[F].delay {
         secureRandomString(deviceIdLength)
@@ -47,11 +47,11 @@ object IdGenerator {
       }
 
     private val Alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-    private val rnd = new SecureRandom
+    private val rnd      = new SecureRandom
 
     private def secureRandomString(len: Int): String = {
       val sb = new StringBuilder(len)
-      var i = 0
+      var i  = 0
       while (i < len) {
         sb.append(Alphabet.charAt(rnd.nextInt(Alphabet.length)))
         i += 1

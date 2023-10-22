@@ -16,23 +16,20 @@
 
 package korolev.effect
 
-import korolev.effect.AsyncTable.{AlreadyContainsKeyException, RemovedBeforePutException}
-
-import korolev.effect.Effect.Promise
-
 import java.util.concurrent.atomic.AtomicReference
-import scala.annotation.tailrec
+import korolev.effect.AsyncTable.{AlreadyContainsKeyException, RemovedBeforePutException}
+import korolev.effect.Effect.Promise
 import korolev.effect.syntax._
+import scala.annotation.tailrec
 
-final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
+final class AsyncTable[F[_]: Effect, K, V](elems: Seq[(K, V)]) {
 
   private type Callbacks = List[Promise[V]]
-  private type Result = Either[Throwable, V]
+  private type Result    = Either[Throwable, V]
 
   private val state = new AtomicReference[Map[K, Either[Callbacks, Result]]](
     elems.toVector.map { case (k, v) => (k, Right(Right(v))) }.toMap
   )
-
 
   def get(key: K): F[V] = Effect[F].promise[V] { cb =>
     @tailrec
@@ -85,9 +82,9 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
     Effect[F].delay {
       val table = state.get
       for {
-        lr <- table.get(key)
+        lr  <- table.get(key)
         res <- lr.toOption
-        v <- res.toOption
+        v   <- res.toOption
       } yield v
     }
 
@@ -109,7 +106,7 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
           case Some(Left(callbacks)) =>
             val newValue = ref.updated(key, Right(errorOrValue))
             if (state.compareAndSet(ref, newValue)) {
-              callbacks.foreach(_ (errorOrValue))
+              callbacks.foreach(_(errorOrValue))
             } else {
               aux()
             }
@@ -126,8 +123,8 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
   def remove(key: K): F[Unit] = Effect[F].delay {
     @tailrec
     def aux(): Unit = {
-      val ref = state.get
-      val value = ref.get(key)
+      val ref        = state.get
+      val value      = ref.get(key)
       val updatedRef = ref - key
       if (state.compareAndSet(ref, updatedRef)) {
         value match {
@@ -146,18 +143,16 @@ final class AsyncTable[F[_] : Effect, K, V](elems: Seq[(K, V)]) {
 
 object AsyncTable {
 
-  final case class RemovedBeforePutException(key: Any)
-    extends Exception(s"Key '$key' removed before value was added.")
+  final case class RemovedBeforePutException(key: Any) extends Exception(s"Key '$key' removed before value was added.")
 
-  final case class AlreadyContainsKeyException(key: Any)
-    extends Exception(s"Already contains value for '$key'.")
+  final case class AlreadyContainsKeyException(key: Any) extends Exception(s"Already contains value for '$key'.")
 
-  def apply[F[_] : Effect, K, V](elems: (K, V)*) =
+  def apply[F[_]: Effect, K, V](elems: (K, V)*) =
     new AsyncTable[F, K, V](elems)
 
-  def unsafeCreateEmpty[F[_] : Effect, K, V] =
+  def unsafeCreateEmpty[F[_]: Effect, K, V] =
     new AsyncTable[F, K, V](Nil)
 
-  def empty[F[_] : Effect, K, V]: F[AsyncTable[F, K, V]] =
+  def empty[F[_]: Effect, K, V]: F[AsyncTable[F, K, V]] =
     Effect[F].delay(new AsyncTable[F, K, V](Nil))
 }

@@ -3,18 +3,19 @@ package korolev.effect.io
 import java.net.SocketAddress
 import java.nio.ByteBuffer
 import java.nio.channels.{AsynchronousChannelGroup, AsynchronousSocketChannel, CompletionHandler}
+import java.util.concurrent.atomic.AtomicReference
 import korolev.data.BytesLike
 import korolev.data.syntax._
-import korolev.effect.io.DataSocket.CloseReason
 import korolev.effect.{Effect, Stream}
+import korolev.effect.io.DataSocket.CloseReason
 import korolev.effect.syntax._
-
-import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 
-sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSocketChannel,
-                                                       readBuffer: ByteBuffer,
-                                                       writeBuffer: ByteBuffer) extends DataSocket[F, B] {
+sealed class RawDataSocket[F[_]: Effect, B: BytesLike](
+  channel: AsynchronousSocketChannel,
+  readBuffer: ByteBuffer,
+  writeBuffer: ByteBuffer
+) extends DataSocket[F, B] {
 
   val stream: Stream[F, B] = new Stream[F, B] {
 
@@ -51,7 +52,7 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
         if (state.compareAndSet(ref, newState)) {
           maybeReason match {
             case Some(reason) => dispatchClose(reason)
-            case None => // do nothing
+            case None         => // do nothing
           }
         } else {
           unsetInProgress(maybeReason)
@@ -68,7 +69,7 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
       if (ref.closed.isEmpty) {
         if (ref.inProgress) {
           cb(Left(new IllegalStateException("This socket already in read state")))
-        } else  {
+        } else {
           // Get reading lock
           if (state.compareAndSet(ref, ref.copy(inProgress = true))) {
             val handler = new CompletionHandler[Integer, Unit] {
@@ -99,7 +100,7 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
     loop()
   }
 
-  def write(buffer: ByteBuffer): F[Unit] = {
+  def write(buffer: ByteBuffer): F[Unit] =
     Effect[F].promise { cb =>
       val ref = state.get
       if (ref.closed.isEmpty) {
@@ -115,7 +116,6 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
         cb(Left(new IllegalStateException(s"Try to write in closed (${ref.closed}) socket")))
       }
     }
-  }
 
   def write(bytes: B): F[Unit] = {
 //    writeBuffer.clear()
@@ -146,19 +146,23 @@ sealed class RawDataSocket[F[_]: Effect, B: BytesLike](channel: AsynchronousSock
   }
 
   private type OnCloseCallback = Effect.Promise[CloseReason]
-  private case class State(inProgress: Boolean = false,
-                           closed: Option[CloseReason] = None,
-                           onCloseCbs: List[OnCloseCallback] = Nil)
+  private case class State(
+    inProgress: Boolean = false,
+    closed: Option[CloseReason] = None,
+    onCloseCbs: List[OnCloseCallback] = Nil
+  )
 
   private val state = new AtomicReference(State())
 }
 
 object RawDataSocket {
 
-  def connect[F[_]: Effect, B: BytesLike](address: SocketAddress,
-                                          readBuffer: ByteBuffer = ByteBuffer.allocate(8096),
-                                          writeBuffer: ByteBuffer = ByteBuffer.allocate(8096),
-                                          group: AsynchronousChannelGroup = null): F[RawDataSocket[F, B]] =
+  def connect[F[_]: Effect, B: BytesLike](
+    address: SocketAddress,
+    readBuffer: ByteBuffer = ByteBuffer.allocate(8096),
+    writeBuffer: ByteBuffer = ByteBuffer.allocate(8096),
+    group: AsynchronousChannelGroup = null
+  ): F[RawDataSocket[F, B]] =
     Effect[F].promise { cb =>
       val channel = AsynchronousSocketChannel.open(group)
       lazy val ds = new RawDataSocket[F, B](channel, readBuffer, writeBuffer)

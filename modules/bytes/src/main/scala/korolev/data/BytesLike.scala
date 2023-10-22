@@ -22,19 +22,22 @@ trait BytesLike[T] {
   def asBuffer(bytes: T): ByteBuffer
   def asHexString(bytes: T): String = {
     val builder = new StringBuilder()
-    foreach(bytes, { x =>
-      val s = (x & 0xFF).toHexString
-      val _ = if (s.length == 2) {
-        builder
-          .append(s)
-          .append(' ')
-      } else {
-        builder
-          .append('0')
-          .append(s)
-          .append(' ')
+    foreach(
+      bytes,
+      { x =>
+        val s = (x & 0xff).toHexString
+        val _ = if (s.length == 2) {
+          builder
+            .append(s)
+            .append(' ')
+        } else {
+          builder
+            .append('0')
+            .append(s)
+            .append(' ')
+        }
       }
-    })
+    )
     builder
       .deleteCharAt(builder.length - 1)
       .mkString
@@ -65,7 +68,7 @@ object BytesLike {
   def apply[T: BytesLike]: BytesLike[T] = implicitly[BytesLike[T]]
 
   implicit object ArrayBytesLikeInstance extends BytesLike[Array[Byte]] {
-    
+
     def ascii(s: String): Array[Byte] =
       s.getBytes(StandardCharsets.US_ASCII)
 
@@ -83,9 +86,8 @@ object BytesLike {
 
     def mapWithIndex(bytes: Array[Byte], f: (Byte, Long) => Byte): Array[Byte] =
       // TODO optimize me
-      bytes.zipWithIndex.map {
-        case (x, i) => 
-          f(x, i.toLong)
+      bytes.zipWithIndex.map { case (x, i) =>
+        f(x, i.toLong)
       }
 
     def foreach(bytes: Array[Byte], f: Byte => Unit): Unit =

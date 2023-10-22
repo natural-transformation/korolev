@@ -19,12 +19,12 @@ package korolev.server
 trait KorolevService[F[_]] {
 
   /**
-    * Process HTTP request
-    */
+   * Process HTTP request
+   */
   def http(request: HttpRequest[F]): F[HttpResponse[F]]
 
   /**
-    * Process WebSocket requests
-    */
+   * Process WebSocket requests
+   */
   def ws(request: WebSocketRequest[F]): F[WebSocketResponse[F]]
 }

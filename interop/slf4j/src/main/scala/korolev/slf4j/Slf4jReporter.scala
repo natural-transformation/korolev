@@ -25,14 +25,14 @@ object Slf4jReporter extends Reporter {
   // It's unnecessary to show Korolev internals to enduser.
   private val logger = LoggerFactory.getLogger("Korolev")
 
-  def error(message: String, cause: Throwable): Unit = logger.error(message, cause)
-  def error(message: String): Unit = logger.error(message)
+  def error(message: String, cause: Throwable): Unit   = logger.error(message, cause)
+  def error(message: String): Unit                     = logger.error(message)
   def warning(message: String, cause: Throwable): Unit = logger.warn(message, cause)
-  def warning(message: String): Unit = logger.warn(message)
-  def info(message: String): Unit = logger.info(message)
+  def warning(message: String): Unit                   = logger.warn(message)
+  def info(message: String): Unit                      = logger.info(message)
 
-  def debug(message: String): Unit = logger.debug(message)
-  def debug(message: String, arg1: Any): Unit = logger.debug(message, arg1)
-  def debug(message: String, arg1: Any, arg2: Any): Unit = logger.debug(message, arg1, arg2)
+  def debug(message: String): Unit                                  = logger.debug(message)
+  def debug(message: String, arg1: Any): Unit                       = logger.debug(message, arg1)
+  def debug(message: String, arg1: Any, arg2: Any): Unit            = logger.debug(message, arg1, arg2)
   def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = logger.debug(message.format(arg1, arg2, arg3))
 }

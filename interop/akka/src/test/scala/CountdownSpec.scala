@@ -1,9 +1,8 @@
+import java.util.concurrent.atomic.AtomicReference
 import korolev.akka.util.Countdown
 import korolev.effect.Effect.FutureEffect
 import korolev.effect.syntax._
 import org.scalatest.freespec.AsyncFreeSpec
-
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
 
 class CountdownSpec extends AsyncFreeSpec {
@@ -56,18 +55,18 @@ class CountdownSpec extends AsyncFreeSpec {
 
   "add should release taken lock" in {
     val effectInstance = new ThrowOnPromise(switch = false)
-    val countdown = new Countdown[Future]()(effectInstance)
-    val result = new AtomicReference[String]("")
+    val countdown      = new Countdown[Future]()(effectInstance)
+    val result         = new AtomicReference[String]("")
     for {
       _ <- countdown.add(3)
       _ <- countdown.decOrLock()
       _ <- countdown.decOrLock()
       _ <- countdown.decOrLock()
       fiber <- countdown
-        .decOrLock() // should lock
-        .map(_ => result.getAndUpdate(_ + " world"))
-        .start
-      _ = result.set("hello")
+                 .decOrLock() // should lock
+                 .map(_ => result.getAndUpdate(_ + " world"))
+                 .start
+      _  = result.set("hello")
       _ <- countdown.add(3)
       _ <- fiber.join()
     } yield assert(result.get == "hello world")
@@ -75,15 +74,15 @@ class CountdownSpec extends AsyncFreeSpec {
 
   "count the lock released by the add invocation" in recoverToSucceededIf[Promise] {
     val effectInstance = new ThrowOnPromise(switch = false)
-    val countdown = new Countdown[Future]()(effectInstance)
+    val countdown      = new Countdown[Future]()(effectInstance)
     for {
       _ <- countdown.add(3)
       _ <- countdown.decOrLock()
       _ <- countdown.decOrLock()
       _ <- countdown.decOrLock()
       fiber <- countdown
-        .decOrLock() // should lock
-        .start
+                 .decOrLock() // should lock
+                 .start
       _ <- countdown.add(3)
       _ <- fiber.join()
       _ <- effectInstance.toggle()

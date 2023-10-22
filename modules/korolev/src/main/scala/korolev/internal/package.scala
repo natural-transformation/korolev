@@ -6,7 +6,7 @@ import scala.collection.mutable
 package object internal {
 
   private[korolev] def jsonEscape(sb: mutable.StringBuilder, s: String, unicode: Boolean): Unit = {
-    var i = 0
+    var i   = 0
     val len = s.length
     while (i < len) {
       (s.charAt(i): @switch) match {
