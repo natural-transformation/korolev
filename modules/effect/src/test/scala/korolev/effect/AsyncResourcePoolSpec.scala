@@ -1,11 +1,10 @@
 package korolev.effect
 
+import java.util.concurrent.atomic.AtomicInteger
 import korolev.effect.Reporter.PrintReporter.Implicit
 import org.scalatest.freespec.AsyncFreeSpec
-
-import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Random
 
 class AsyncResourcePoolSpec extends AsyncFreeSpec {
@@ -16,7 +15,7 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
   "Create new item if pool is empty" in {
     for {
       pool <- preparePool()
-      _ <- pool.borrow()
+      _    <- pool.borrow()
     } yield {
       assert(pool.unsafeGetState.total == 1)
       assert(pool.unsafeGetState.items.isEmpty)
@@ -25,8 +24,8 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Create new item if all items are borrowed" in {
     for {
-      pool <- preparePool()
-      firstBorrow <- pool.borrow()
+      pool         <- preparePool()
+      firstBorrow  <- pool.borrow()
       secondBorrow <- pool.borrow()
     } yield {
       assert(firstBorrow.value != secondBorrow.value)
@@ -37,11 +36,11 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Create new item for a waiter if borrowed item had closed" in {
     for {
-      pool <- preparePool()
-      firstBorrow <- pool.borrow()
+      pool         <- preparePool()
+      firstBorrow  <- pool.borrow()
       secondBorrow <- pool.borrow()
-      thirdBorrow = pool.borrow()
-      _ <- firstBorrow.value.close()
+      thirdBorrow   = pool.borrow()
+      _            <- firstBorrow.value.close()
     } yield {
       assert(thirdBorrow.isCompleted)
       assert(pool.unsafeGetState.total == 2)
@@ -51,9 +50,9 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Gives one of idle items if it exists" in {
     for {
-      pool <- preparePool()
-      firstBorrow <- pool.borrow()
-      _ <- firstBorrow.give()
+      pool         <- preparePool()
+      firstBorrow  <- pool.borrow()
+      _            <- firstBorrow.give()
       secondBorrow <- pool.borrow()
     } yield {
       assert(firstBorrow.value eq secondBorrow.value)
@@ -64,9 +63,9 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Return item to pool" in {
     for {
-      pool <- preparePool()
+      pool        <- preparePool()
       firstBorrow <- pool.borrow()
-      _ <- firstBorrow.give()
+      _           <- firstBorrow.give()
     } yield {
       assert(pool.unsafeGetState.total == 1)
       assert(pool.unsafeGetState.items.nonEmpty)
@@ -75,10 +74,10 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Keep waiting if all items are borrowed and maxCount exceeded" in {
     for {
-      pool <- preparePool()
-      firstBorrow <- pool.borrow()
+      pool         <- preparePool()
+      firstBorrow  <- pool.borrow()
       secondBorrow <- pool.borrow()
-      thirdBorrow = pool.borrow()
+      thirdBorrow   = pool.borrow()
     } yield {
       assert(!thirdBorrow.isCompleted)
       assert(pool.unsafeGetState.total == 2)
@@ -88,11 +87,11 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Transfer item to next borrower in a queue" in {
     for {
-      pool <- preparePool()
+      pool        <- preparePool()
       firstBorrow <- pool.borrow()
-      _ <- pool.borrow()
-      thirdBorrow = pool.borrow()
-      _ <- firstBorrow.give()
+      _           <- pool.borrow()
+      thirdBorrow  = pool.borrow()
+      _           <- firstBorrow.give()
     } yield {
       assert(thirdBorrow.isCompleted)
       assert(pool.unsafeGetState.total == 2)
@@ -102,10 +101,10 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Do not take back closed items" in {
     for {
-      pool <- preparePool()
+      pool        <- preparePool()
       firstBorrow <- pool.borrow()
-      _ <- firstBorrow.value.close()
-      _ <- firstBorrow.give()
+      _           <- firstBorrow.value.close()
+      _           <- firstBorrow.give()
     } yield {
       assert(pool.unsafeGetState.total == 0)
       assert(pool.unsafeGetState.items.isEmpty)
@@ -114,20 +113,20 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
 
   "Close obsolete resources on cleanup" in {
     for {
-      clock <- prepareClock()
-      pool <- preparePool(maxCount = 5, currentTime = clock.currentNanos)
+      clock   <- prepareClock()
+      pool    <- preparePool(maxCount = 5, currentTime = clock.currentNanos)
       borrow1 <- pool.borrow()
       borrow2 <- pool.borrow()
       borrow3 <- pool.borrow()
       borrow4 <- pool.borrow()
       borrow5 <- pool.borrow()
-      _ <- borrow1.give()
-      _ <- borrow2.give()
-      _ <- clock.set(150)
-      _ <- borrow3.give()
-      _ <- borrow4.give()
-      _ <- borrow5.give()
-      _ <- pool.cleanup()
+      _       <- borrow1.give()
+      _       <- borrow2.give()
+      _       <- clock.set(150)
+      _       <- borrow3.give()
+      _       <- borrow4.give()
+      _       <- borrow5.give()
+      _       <- pool.cleanup()
     } yield {
       val state = pool.unsafeGetState
       assert(borrow1.value.closed)
@@ -141,26 +140,25 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
   }
 
   "Work correctly in concurrent environment" in {
-    val pool = preparePoolNow(5)
-    val result = new AtomicInteger(0)
-    val loops = 12
+    val pool       = preparePoolNow(5)
+    val result     = new AtomicInteger(0)
+    val loops      = 12
     val iterations = 30000
 
-    def loop(i: Int): Future[Unit] = {
+    def loop(i: Int): Future[Unit] =
       if (i > 0) {
         for {
-          borrow <- pool.borrow()
+          borrow   <- pool.borrow()
           sleepTime = (Random.nextInt(200) + 10).micros
-          _ <- Scheduler[Future].sleep(sleepTime)
-          _ = result.incrementAndGet()
-          _ <- if (Random.nextInt(5000) == 1) borrow.value.close() else Future.unit
-          _ <- borrow.give()
-          _ <- loop(i - 1)
+          _        <- Scheduler[Future].sleep(sleepTime)
+          _         = result.incrementAndGet()
+          _        <- if (Random.nextInt(5000) == 1) borrow.value.close() else Future.unit
+          _        <- borrow.give()
+          _        <- loop(i - 1)
         } yield ()
       } else {
         Future.unit
       }
-    }
 
     Future.sequence(1.to(loops).map(_ => loop(iterations))).map { _ =>
       assert(result.get == loops * iterations)
@@ -170,18 +168,21 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
   val timeZero: () => Future[Long] =
     () => Future.successful(0)
 
-  def preparePoolNow(maxCount: Int = 2,
-                     currentTime: () => Future[Long] = timeZero,
-                     maxIdleTime: FiniteDuration = 100.nanos): AsyncResourcePool[Future, Resource] = {
+  def preparePoolNow(
+    maxCount: Int = 2,
+    currentTime: () => Future[Long] = timeZero,
+    maxIdleTime: FiniteDuration = 100.nanos
+  ): AsyncResourcePool[Future, Resource] = {
     def factory = Future.successful(new Resource())
     new AsyncResourcePool[Future, Resource]("case", factory, currentTime, maxCount, maxIdleTime)
   }
 
-  def preparePool(maxCount: Int = 2,
-                  currentTime: () => Future[Long] = timeZero,
-                  maxIdleTime: FiniteDuration = 100.nanos): Future[AsyncResourcePool[Future, Resource]] = {
+  def preparePool(
+    maxCount: Int = 2,
+    currentTime: () => Future[Long] = timeZero,
+    maxIdleTime: FiniteDuration = 100.nanos
+  ): Future[AsyncResourcePool[Future, Resource]] =
     Future.successful(preparePoolNow(maxCount, currentTime, maxIdleTime))
-  }
 
   def prepareClock(): Future[Clock] = Future.successful(new Clock)
 
@@ -195,7 +196,7 @@ class AsyncResourcePoolSpec extends AsyncFreeSpec {
   }
 
   class Resource {
-    @volatile var closed = false
+    @volatile var closed   = false
     @volatile var promises = List.empty[Promise[Unit]]
 
     def onClose(): Future[Unit] = this.synchronized {

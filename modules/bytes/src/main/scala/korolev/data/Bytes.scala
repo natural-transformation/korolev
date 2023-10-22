@@ -37,33 +37,32 @@ object Bytes {
   val empty: Bytes = Bytes.wrap(new Array[Byte](0))
 
   def wrap[T: BytesLike](that: T): Bytes = new Bytes {
-    def apply(i: Int): Byte = BytesLike[T].get(that, i)
+    def apply(i: Int): Byte  = BytesLike[T].get(that, i)
     def apply(i: Long): Byte = BytesLike[T].get(that, i)
-    def concat(right: Bytes): Bytes = {
+    def concat(right: Bytes): Bytes =
       if (BytesLike[T].length(that) == 0) {
         right
       } else {
         Bytes.wrap(BytesLike[T].concat(that, right.as[T]))
       }
-    }
-    def ++(right: Bytes): Bytes = concat(right)
-    def as[T2: BytesLike]: T2 = BytesLike[T].as[T2](that)
-    def asAsciiString: String = BytesLike[T].asAsciiString(that)
-    def asUtf8String: String = BytesLike[T].asUtf8String(that)
-    def asString(charset: Charset): String = BytesLike[T].asString(that, charset)
-    def slice(from: Long, until: Long): Bytes = Bytes.wrap(BytesLike[T].slice(that, from, until))
-    def indexOf(elem: Byte): Long = BytesLike[T].indexOf(that, elem)
-    def lastIndexOf(elem: Byte): Long = BytesLike[T].lastIndexOf(that, elem)
-    def indexOfSlice(elem: Bytes): Long = BytesLike[T].indexOfSlice(that, elem.as[T])
-    def lastIndexOfSlice(elem: Bytes): Long = BytesLike[T].lastIndexOfSlice(that, elem.as[T])
-    def length: Long = BytesLike[T].length(that)
-    def asArray: Array[Byte] = BytesLike[T].asArray(that)
-    def asBuffer: ByteBuffer = BytesLike[T].asBuffer(that)
-    def asHexString: String = BytesLike[T].asHexString(that)
-    def indexOf(elem: Byte, start: Long): Long = BytesLike[T].indexOf(that, elem, start)
+    def ++(right: Bytes): Bytes                      = concat(right)
+    def as[T2: BytesLike]: T2                        = BytesLike[T].as[T2](that)
+    def asAsciiString: String                        = BytesLike[T].asAsciiString(that)
+    def asUtf8String: String                         = BytesLike[T].asUtf8String(that)
+    def asString(charset: Charset): String           = BytesLike[T].asString(that, charset)
+    def slice(from: Long, until: Long): Bytes        = Bytes.wrap(BytesLike[T].slice(that, from, until))
+    def indexOf(elem: Byte): Long                    = BytesLike[T].indexOf(that, elem)
+    def lastIndexOf(elem: Byte): Long                = BytesLike[T].lastIndexOf(that, elem)
+    def indexOfSlice(elem: Bytes): Long              = BytesLike[T].indexOfSlice(that, elem.as[T])
+    def lastIndexOfSlice(elem: Bytes): Long          = BytesLike[T].lastIndexOfSlice(that, elem.as[T])
+    def length: Long                                 = BytesLike[T].length(that)
+    def asArray: Array[Byte]                         = BytesLike[T].asArray(that)
+    def asBuffer: ByteBuffer                         = BytesLike[T].asBuffer(that)
+    def asHexString: String                          = BytesLike[T].asHexString(that)
+    def indexOf(elem: Byte, start: Long): Long       = BytesLike[T].indexOf(that, elem, start)
     def mapWithIndex(f: (Byte, Long) => Byte): Bytes = Bytes.wrap(BytesLike[T].mapWithIndex(that, f))
-    def foreach(f: Byte => Unit): Unit = BytesLike[T].foreach(that, f)
-    def copyToBuffer(buffer: ByteBuffer): Int = BytesLike[T].copyToBuffer(that, buffer)
+    def foreach(f: Byte => Unit): Unit               = BytesLike[T].foreach(that, f)
+    def copyToBuffer(buffer: ByteBuffer): Int        = BytesLike[T].copyToBuffer(that, buffer)
 
     override def equals(obj: Any): Boolean =
       if (obj.isInstanceOf[Bytes]) BytesLike[T].eq(that, obj.asInstanceOf[Bytes].as[T])
@@ -138,7 +137,7 @@ object Bytes {
     def indexOf(where: Bytes, that: Byte): Long =
       where.indexOf(that)
 
-    def indexOf(where: Bytes, that: Byte, from: Long): Long = 
+    def indexOf(where: Bytes, that: Byte, from: Long): Long =
       where.indexOf(that, from)
 
     def lastIndexOf(where: Bytes, that: Byte): Long =

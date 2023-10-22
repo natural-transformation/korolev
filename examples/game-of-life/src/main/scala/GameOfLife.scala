@@ -1,9 +1,8 @@
 import korolev._
-import korolev.server._
 import korolev.akka._
-import scala.concurrent.ExecutionContext.Implicits.global
+import korolev.server._
 import korolev.state.javaSerialization._
-
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 object GameOfLife extends SimpleAkkaHttpKorolevApp {
@@ -12,12 +11,12 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
   import levsha.dsl._
 
   val universeSize = 20
-  val cellRadius = 10
-  val cellGap = 2
-  val cellWidth = cellRadius * 2
-  val viewSide = cellRadius + universeSize * (cellWidth + cellGap)
+  val cellRadius   = 10
+  val cellGap      = 2
+  val cellWidth    = cellRadius * 2
+  val viewSide     = cellRadius + universeSize * (cellWidth + cellGap)
 
-  val viewSideS = viewSide.toString
+  val viewSideS   = viewSide.toString
   val cellRadiusS = cellRadius.toString
 
   def renderUniverse(universe: Universe): Node = {
@@ -28,17 +27,17 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
       p.toString
     }
 
-    def onClick(x: Int, y: Int)(access: Access) = {
+    def onClick(x: Int, y: Int)(access: Access) =
       access.transition(_.check(x, y))
-    }
 
-    def choseColor(x: Int, y: Int) = {
+    def choseColor(x: Int, y: Int) =
       if (universe(x, y).alive) "#000000"
       else "#EEEEEE"
-    }
 
     optimize {
-      Svg(width := viewSideS, height := viewSideS,
+      Svg(
+        width  := viewSideS,
+        height := viewSideS,
         for {
           x <- 0 until universe.size
           y <- 0 until universe.size
@@ -56,28 +55,29 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
     }
   }
 
-  import html._
+  import levsha.dsl.html._
 
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Universe, Any](
       stateLoader = StateLoader.default(Universe(universeSize)),
-      document = universe => optimize {
-        Html(
-          body(
-            div(
-              button(
-                event("click") { access =>
-                  access.transition { case state =>
-                    state.next
-                  }
-                },
-                "Step"
-              )
-            ),
-            renderUniverse(universe)
+      document = universe =>
+        optimize {
+          Html(
+            body(
+              div(
+                button(
+                  event("click") { access =>
+                    access.transition { case state =>
+                      state.next
+                    }
+                  },
+                  "Step"
+                )
+              ),
+              renderUniverse(universe)
+            )
           )
-        )
-      }
+        }
     )
   }
 }
@@ -85,44 +85,43 @@ object GameOfLife extends SimpleAkkaHttpKorolevApp {
 case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
   import Universe._
-
   import scala.annotation.tailrec
 
-  private def index(x: Int, y: Int) = {
+  private def index(x: Int, y: Int) =
     // Torus
-    (x % size + size) % size +
-    (y % size + size) % size * size
-  }
+    (x   % size + size) % size +
+      (y % size + size) % size * size
 
   /**
-    * Get a cell in (x, y)
-    * @return the cell
-    */
+   * Get a cell in (x, y)
+   * @return
+   *   the cell
+   */
   def apply(x: Int, y: Int): Cell = cells(index(x, y))
 
   /**
-    * Kill or resurrect a cell in (x, y)
-    * @return Modified universe
-    */
+   * Kill or resurrect a cell in (x, y)
+   * @return
+   *   Modified universe
+   */
   def check(x: Int, y: Int): Universe = {
-    val i = index(x, y)
+    val i    = index(x, y)
     val cell = cells(i)
     copy(cells = cells.updated(i, cell.copy(alive = !cell.alive)))
   }
 
   /**
-    * Create a new generation of universe
-    */
+   * Create a new generation of universe
+   */
   def next: Universe = {
 
     def aliveNeighbors(px: Int, py: Int): Int = {
-      @tailrec def aux(num: Int = 0, x: Int = px + 1, y: Int = py + 1): Int = {
+      @tailrec def aux(num: Int = 0, x: Int = px + 1, y: Int = py + 1): Int =
         if (y < py - 1) num
         else if (x < px - 1) aux(num, y = y - 1)
         else if (x == px && y == py) aux(num, x - 1, y)
         else if (apply(x, y).alive) aux(num + 1, x - 1, y)
         else aux(num, x - 1, y)
-      }
       aux()
     }
 
@@ -135,8 +134,8 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
 
     val updated = cells map {
       case p @ Cell(x, y, false) if mustResurrect(x, y) => p.copy(alive = true)
-      case p @ Cell(x, y, true) if mustDie(x, y) => p.copy(alive = false)
-      case p => p
+      case p @ Cell(x, y, true) if mustDie(x, y)        => p.copy(alive = false)
+      case p                                            => p
     }
     copy(cells = updated)
   }
@@ -149,9 +148,9 @@ object Universe {
   case class Cell(x: Int, y: Int, alive: Boolean)
 
   def apply(size: Int): Universe = {
-    val cells = for (y <- 0 until size; x <- 0 until size)
-      yield Cell(x, y, alive = false)
+    val cells =
+      for (y <- 0 until size; x <- 0 until size)
+        yield Cell(x, y, alive = false)
     Universe(cells.toVector, size)
   }
 }
-

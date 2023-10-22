@@ -3,8 +3,7 @@ package korolev.util
 /**
  * Very simple all-in-one optic.
  */
-case class Lens[S, S2](read: PartialFunction[S, S2],
-                       write: PartialFunction[(S, S2), S]) {
+case class Lens[S, S2](read: PartialFunction[S, S2], write: PartialFunction[(S, S2), S]) {
 
   def get(that: S): Option[S2] =
     read.lift(that)
@@ -17,13 +16,12 @@ case class Lens[S, S2](read: PartialFunction[S, S2],
   def update(that: S, value: S2): S =
     write.lift(that, value).getOrElse(that)
 
-  def focus[S3](read: PartialFunction[S2, S3],
-                write: PartialFunction[(S2, S3), S2]): Lens[S, S3] = {
+  def focus[S3](read: PartialFunction[S2, S3], write: PartialFunction[(S2, S3), S2]): Lens[S, S3] = {
     val composedWrite: (S, S3) => Option[S] = { (s, s3) =>
       for {
-        origS2 <- this.read.lift(s)
+        origS2    <- this.read.lift(s)
         updatedS2 <- write.lift(origS2, s3)
-        updatedS <- this.write.lift(s, updatedS2)
+        updatedS  <- this.write.lift(s, updatedS2)
       } yield updatedS
     }
     Lens(this.read.andThen(read), Function.unlift(composedWrite.tupled))

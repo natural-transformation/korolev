@@ -20,15 +20,17 @@ import java.net.{URLDecoder, URLEncoder}
 import java.nio.charset.StandardCharsets
 
 /**
-  * @param body Should be handled before response be given
-  */
-final case class Request[Body](method: Request.Method,
-                               pq: PathAndQuery,
-                               headers: Seq[(String, String)],
-                               contentLength: Option[Long],
-                               body: Body,
-                               renderedCookie: String = null)
-    extends Request.Head {
+ * @param body
+ *   Should be handled before response be given
+ */
+final case class Request[Body](
+  method: Request.Method,
+  pq: PathAndQuery,
+  headers: Seq[(String, String)],
+  contentLength: Option[Long],
+  body: Body,
+  renderedCookie: String = null
+) extends Request.Head {
 
   private lazy val parsedCookie = {
     def d(s: String) = URLDecoder.decode(s.trim, "UTF-8")
@@ -55,9 +57,8 @@ final case class Request[Body](method: Request.Method,
       case (k, v) if k.equalsIgnoreCase(header) => v
     }
 
-  def withParam(name: String, value: String): Request[Body] = {
+  def withParam(name: String, value: String): Request[Body] =
     copy(pq = pq.withParam(name, value))
-  }
 
   def withCookie(name: String, value: String): Request[Body] = {
     val ek = URLEncoder.encode(name, "UTF-8")
@@ -113,14 +114,14 @@ object Request {
         case _         => Unknown(method)
       }
 
-    case object Post extends Method("POST")
-    case object Get extends Method("GET")
-    case object Put extends Method("PUT")
-    case object Delete extends Method("DELETE")
-    case object Options extends Method("OPTIONS")
-    case object Head extends Method("HEAD")
-    case object Trace extends Method("TRACE")
-    case object Connect extends Method("CONNECT")
+    case object Post                               extends Method("POST")
+    case object Get                                extends Method("GET")
+    case object Put                                extends Method("PUT")
+    case object Delete                             extends Method("DELETE")
+    case object Options                            extends Method("OPTIONS")
+    case object Head                               extends Method("HEAD")
+    case object Trace                              extends Method("TRACE")
+    case object Connect                            extends Method("CONNECT")
     case class Unknown(override val value: String) extends Method(value)
   }
 }

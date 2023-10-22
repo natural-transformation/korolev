@@ -8,9 +8,8 @@ object Caps {
 
   def apply(builder: () => DesiredCapabilities)(capabilities: (String, Any)*): Caps = {
     val caps = builder()
-    capabilities foreach {
-      case (k, v) =>
-        caps.setCapability(k, v)
+    capabilities foreach { case (k, v) =>
+      caps.setCapability(k, v)
     }
     new Caps(caps)
   }

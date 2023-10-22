@@ -18,32 +18,35 @@ package korolev
 
 import korolev.effect.Effect
 import korolev.effect.syntax._
-
 import korolev.util.Lens
 import korolev.web.PathAndQuery
 
 /**
-  * URL routing definition
-  *
-  * @param fromState From current state to Uri
-  * @param toState From Uri to state
-  *
-  * @tparam F A async control
-  * @tparam S Type of State
-  */
+ * URL routing definition
+ *
+ * @param fromState
+ *   From current state to Uri
+ * @param toState
+ *   From Uri to state
+ *
+ * @tparam F
+ *   A async control
+ * @tparam S
+ *   Type of State
+ */
 final case class Router[F[_], S](
-    fromState: PartialFunction[S, PathAndQuery],
-    toState: PartialFunction[PathAndQuery, S => F[S]]
+  fromState: PartialFunction[S, PathAndQuery],
+  toState: PartialFunction[PathAndQuery, S => F[S]]
 ) {
 
   /**
-    * Compose two routers to one.
-    * {{{
-    * val articlesRouter = Router(...)
-    * val authorsRouter = Router(...)
-    * val router = articlesRouter ++ authorsRouter
-    * }}}
-    */
+   * Compose two routers to one.
+   * {{{
+   * val articlesRouter = Router(...)
+   * val authorsRouter = Router(...)
+   * val router = articlesRouter ++ authorsRouter
+   * }}}
+   */
   def ++(that: Router[F, S]): Router[F, S] =
     Router(fromState.orElse(that.fromState), toState.orElse(that.toState))
 }
@@ -53,8 +56,9 @@ object Router {
   def empty[F[_], S]: Router[F, S] = Router(PartialFunction.empty, PartialFunction.empty)
 
   def apply[F[_]: Effect, S, S2](lens: Lens[S, S2])(
-      fromState: PartialFunction[S2, PathAndQuery] = PartialFunction.empty,
-      toState: PartialFunction[PathAndQuery, S2 => F[S2]] = PartialFunction.empty): Router[F, S] =
+    fromState: PartialFunction[S2, PathAndQuery] = PartialFunction.empty,
+    toState: PartialFunction[PathAndQuery, S2 => F[S2]] = PartialFunction.empty
+  ): Router[F, S] =
     Router(
       fromState = lens.read.andThen(fromState),
       toState = toState.andThen { f => s =>

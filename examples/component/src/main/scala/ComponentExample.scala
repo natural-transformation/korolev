@@ -5,22 +5,20 @@ import korolev.effect.Scheduler
 import korolev.effect.syntax.*
 import korolev.server.*
 import korolev.state.javaSerialization.*
-
-import scala.concurrent.Future
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 object ComponentExample extends SimpleAkkaHttpKorolevApp {
 
   import State.globalContext._
-
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
 
   type Rgb = (Int, Int, Int)
   val Black = (0, 0, 0)
-  val Red = (255, 0, 0)
+  val Red   = (255, 0, 0)
 
   def randomRgb() = (Random.nextInt(255), Random.nextInt(255), Random.nextInt(255))
 
@@ -59,8 +57,8 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
         label,
         event("click") { access =>
           access.publish(()).flatMap { _ =>
-            access.transition {
-              case _ => randomRgb()
+            access.transition { case _ =>
+              randomRgb()
             }
           }
         }
@@ -68,21 +66,19 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
     }
   }
 
-  object ComponentWithStateLoader extends Component[Future, String, Int, Any](
-    loadState = (params: Int) =>
-      Scheduler[Future].sleep(1000.millis).as(params.toString)
-  ) {
-    def render(parameters: Int, state: String): context.Node = {
+  object ComponentWithStateLoader
+      extends Component[Future, String, Int, Any](
+        loadState = (params: Int) => Scheduler[Future].sleep(1000.millis).as(params.toString)
+      ) {
+    def render(parameters: Int, state: String): context.Node =
       div(s"Render with state, State is ${state}")
-    }
 
-    override def renderNoState(parameters: Int): context.Node = {
+    override def renderNoState(parameters: Int): context.Node =
       div(s"Render without state")
-    }
   }
 
   val service: AkkaHttpService = akkaHttpService {
-    KorolevServiceConfig[Future, String, Any] (
+    KorolevServiceConfig[Future, String, Any](
       stateLoader = StateLoader.default("a"),
       document = { state =>
         Html(
@@ -111,4 +107,3 @@ object ComponentExample extends SimpleAkkaHttpKorolevApp {
 object State {
   val globalContext = Context[Future, String, Any]
 }
-

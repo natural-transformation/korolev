@@ -5,7 +5,7 @@ import scala.concurrent.ExecutionContext
 object testExecution {
 
   private class RunNowExecutionContext extends ExecutionContext {
-    def execute(runnable: Runnable): Unit = runnable.run()
+    def execute(runnable: Runnable): Unit     = runnable.run()
     def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
   }
 

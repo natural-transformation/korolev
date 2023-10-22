@@ -1,9 +1,8 @@
 import korolev.Context
 import korolev.akka._
+import korolev.monix._
 import korolev.server.{KorolevServiceConfig, StateLoader}
 import korolev.state.javaSerialization._
-import korolev.monix._
-
 import monix.eval.Task
 import monix.execution.Scheduler.Implicits.global
 
@@ -13,7 +12,7 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
 
   import ctx._
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
 
   private val aInput = elementId()
   private val bInput = elementId()
@@ -21,19 +20,20 @@ object MonixExample extends SimpleAkkaHttpKorolevApp {
   def service: AkkaHttpService = akkaHttpService {
     KorolevServiceConfig[Task, Option[String], Any](
       stateLoader = StateLoader.default(None),
-      document = maybeResult => optimize {
-        Html(
-          body(
-            form(
-              input(aInput, `type` := "number", event("input")(onChange)),
-              span("+"),
-              input(bInput, `type` := "number", event("input")(onChange)),
-              span("="),
-              maybeResult.map(result => span(result)),
+      document = maybeResult =>
+        optimize {
+          Html(
+            body(
+              form(
+                input(aInput, `type` := "number", event("input")(onChange)),
+                span("+"),
+                input(bInput, `type` := "number", event("input")(onChange)),
+                span("="),
+                maybeResult.map(result => span(result))
+              )
             )
           )
-        )
-      }
+        }
     )
   }
 

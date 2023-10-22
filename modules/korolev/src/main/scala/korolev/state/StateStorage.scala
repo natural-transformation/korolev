@@ -18,18 +18,16 @@ package korolev.state
 
 import java.io.{File, FileInputStream, FileOutputStream}
 import java.util
-
 import korolev.effect.Effect
 import korolev.internal.DevMode
 import levsha.Id
-
 import scala.collection.concurrent.TrieMap
 
 abstract class StateStorage[F[_]: Effect, S] {
 
   /**
-    * Check if state manager for the session is exist
-    */
+   * Check if state manager for the session is exist
+   */
   def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean]
 
   /**
@@ -38,38 +36,36 @@ abstract class StateStorage[F[_]: Effect, S] {
   def create(deviceId: DeviceId, sessionId: SessionId, topLevelState: S): F[StateManager[F]]
 
   /**
-    * Restore session manager from storage
-    */
+   * Restore session manager from storage
+   */
   def get(deviceId: DeviceId, sessionId: SessionId): F[StateManager[F]]
 
   /**
-    * Marks session to remove
-    */
+   * Marks session to remove
+   */
   def remove(deviceId: DeviceId, sessionId: SessionId): Unit
 }
 
 object StateStorage {
 
-  private [korolev] final class DefaultStateStorage[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int)
-    extends StateStorage[F, S] {
+  private[korolev] final class DefaultStateStorage[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int)
+      extends StateStorage[F, S] {
 
     private val cache = TrieMap.empty[String, StateManager[F]]
     private val forDeletionCache = {
-      new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7F, true) {
-        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean = {
+      new util.LinkedHashMap[String, StateManager[F]](forDeletionCacheCapacity, 0.7f, true) {
+        override def removeEldestEntry(entry: java.util.Map.Entry[String, StateManager[F]]): Boolean =
           this.size() > forDeletionCacheCapacity
-        }
       }
     }
 
-    def mkKey(deviceId: DeviceId, sessionId: SessionId): String = {
+    def mkKey(deviceId: DeviceId, sessionId: SessionId): String =
       s"$deviceId-$sessionId"
-    }
 
     def exists(deviceId: DeviceId, sessionId: SessionId): F[Boolean] = {
       val key = mkKey(deviceId, sessionId)
       if (DevMode.isActive) {
-        val file = new File(DevMode.sessionsDirectory, key)
+        val file   = new File(DevMode.sessionsDirectory, key)
         val result = cache.contains(key) || forDeletionCache.containsKey(key) || file.exists()
         Effect[F].delay(result)
       } else {
@@ -108,12 +104,11 @@ object StateStorage {
       val key = mkKey(deviceId, sessionId)
       if (DevMode.isActive) {
         val directory = new File(DevMode.sessionsDirectory, key)
-        val sm = new DevModeStateManager[F](directory)
+        val sm        = new DevModeStateManager[F](directory)
         cache.put(key, sm)
         if (directory.exists()) Effect[F].delay(sm) // Do not rewrite state manager cache
         else Effect[F].map(sm.write(Id.TopLevel, state))(_ => sm)
-      }
-      else {
+      } else {
         val sm = new SimpleInMemoryStateManager[F]()
         cache.put(key, sm)
         Effect[F].map(sm.write(Id.TopLevel, state))(_ => sm)
@@ -148,14 +143,13 @@ object StateStorage {
 
         val cache: Map[Id, Array[Byte]] = directory
           .listFiles()
-          .map { file => Id(file.getName) -> readFile(file) }
+          .map(file => Id(file.getName) -> readFile(file))
           .toMap
 
-        def apply[T: StateDeserializer](nodeId: Id): Option[T] = {
+        def apply[T: StateDeserializer](nodeId: Id): Option[T] =
           cache.get(nodeId) flatMap { data =>
             implicitly[StateDeserializer[T]].deserialize(data)
           }
-        }
       }
     }
 
@@ -180,13 +174,13 @@ object StateStorage {
       }
 
       val outputStream = new FileOutputStream(file)
-      val data = implicitly[StateSerializer[T]].serialize(value)
+      val data         = implicitly[StateSerializer[T]].serialize(value)
       outputStream.write(data)
     }
 
     def readFile(file: File): Array[Byte] = {
       val stream = new FileInputStream(file)
-      val data = new Array[Byte](file.length().toInt)
+      val data   = new Array[Byte](file.length().toInt)
       stream.read(data)
       data
     }
@@ -225,7 +219,6 @@ object StateStorage {
       }
   }
 
-  def apply[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int = 5000): StateStorage[F, S] = {
+  def apply[F[_]: Effect, S: StateSerializer](forDeletionCacheCapacity: Int = 5000): StateStorage[F, S] =
     new DefaultStateStorage[F, S](forDeletionCacheCapacity)
-  }
 }

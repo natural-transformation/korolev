@@ -17,20 +17,19 @@
 package korolev.effect
 
 import korolev.effect.Effect.Fiber
-
 import scala.annotation.implicitNotFound
+import scala.concurrent.{blocking => futureBlocking, Await, ExecutionContext, Future}
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future, blocking => futureBlocking}
 import scala.util.{Failure, Success, Try}
 
 /**
-  * Korolev's internal presentation of effect (such as Future, cats.effect.IO, Monix or ZIO tasks).
-  * Contains enough functionality to make Korolev works.
-  */
+ * Korolev's internal presentation of effect (such as Future, cats.effect.IO,
+ * Monix or ZIO tasks). Contains enough functionality to make Korolev works.
+ */
 @implicitNotFound("Instance of Effect for ${F} is not found.")
 trait Effect[F[_]] {
   private val noneVal: F[None.type] = pure(None)
-  def none[A]: F[Option[A]] = noneVal.asInstanceOf[F[Option[A]]]
+  def none[A]: F[Option[A]]         = noneVal.asInstanceOf[F[Option[A]]]
   def pure[A](value: A): F[A]
   def delay[A](value: => A): F[A]
   def delayAsync[A](value: => F[A]): F[A] = flatMap(delay(value))(identity)
@@ -46,13 +45,17 @@ trait Effect[F[_]] {
   def recoverF[A, AA >: A](m: F[A])(f: PartialFunction[Throwable, F[AA]]): F[AA]
 //  def onError[A](m: F[A])(f: Throwable => Unit): F[A]
 //  def onErrorF[A](m: F[A])(f: Throwable => F[Unit]): F[A]
-  /** Keep in mind that when [[F]] has strict semantic, effect should
-    * created inside 'start()' brackets. */
+  /**
+   * Keep in mind that when [[F]] has strict semantic, effect should created
+   * inside 'start()' brackets.
+   */
   def start[A](create: => F[A])(implicit ec: ExecutionContext): F[Fiber[F, A]]
   def blocking[T](f: => T)(implicit ec: ExecutionContext): F[T]
 
-  /** Keep in mind that when [[F]] has strict semantic, effect should
-    * created inside 'fork()' brackets. */
+  /**
+   * Keep in mind that when [[F]] has strict semantic, effect should created
+   * inside 'fork()' brackets.
+   */
   def fork[A](m: => F[A])(implicit ec: ExecutionContext): F[A]
   def sequence[A](in: List[F[A]]): F[List[A]]
   def runAsync[A](m: F[A])(callback: Either[Throwable, A] => Unit): Unit
@@ -73,14 +76,14 @@ object Effect {
   class FutureEffect extends Effect[Future] {
     private implicit val immediateEc: ExecutionContext = new ExecutionContext {
       // Run on the same thread
-      def execute(runnable: Runnable): Unit = runnable.run()
+      def execute(runnable: Runnable): Unit     = runnable.run()
       def reportFailure(cause: Throwable): Unit = cause.printStackTrace()
     }
-    val unit: Future[Unit] = Future.unit
-    def never[T]: Future[T] = Future.never
+    val unit: Future[Unit]                   = Future.unit
+    def never[T]: Future[T]                  = Future.never
     def toFuture[A](m: Future[A]): Future[A] = m
-    def fail[A](e: Throwable): Future[A] = Future.failed(e)
-    def pure[A](value: A): Future[A] = Future.successful(value)
+    def fail[A](e: Throwable): Future[A]     = Future.failed(e)
+    def pure[A](value: A): Future[A]         = Future.successful(value)
     def delay[A](value: => A): Future[A] =
       try {
         Future.successful(value)
@@ -90,14 +93,14 @@ object Effect {
       }
     def fork[A](m: => Future[A])(implicit ec: ExecutionContext): Future[A] =
       Future(m)(ec).flatten
-    def fromTry[A](value: => Try[A]): Future[A] = Future.fromTry(value)
+    def fromTry[A](value: => Try[A]): Future[A]                   = Future.fromTry(value)
     def flatMap[A, B](m: Future[A])(f: A => Future[B]): Future[B] = m.flatMap(f)
-    def map[A, B](m: Future[A])(f: A => B): Future[B] = m.map(f)
+    def map[A, B](m: Future[A])(f: A => B): Future[B]             = m.map(f)
     def runAsync[A](m: Future[A])(f: Either[Throwable, A] => Unit): Unit =
       m.onComplete(x => f(x.toEither))
     def run[A](m: Future[A]): Either[Throwable, A] =
       Try(Await.result(m, Duration.Inf)).toEither
-    def recover[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, AA]): Future[AA] = m.recover(f)
+    def recover[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, AA]): Future[AA]          = m.recover(f)
     def recoverF[A, AA >: A](m: Future[A])(f: PartialFunction[Throwable, Future[AA]]): Future[AA] = m.recoverWith(f)
 //    def onError[A](m: Future[A])(f: Throwable => Unit): Future[A] = {
 //      m.onComplete {
@@ -115,8 +118,10 @@ object Effect {
 //      }
 //      m
 //    }
-    /** Keep in mind that when [[F]] has strict semantic, effect should
-      * created inside 'start()' brackets. */
+    /**
+     * Keep in mind that when [[F]] has strict semantic, effect should created
+     * inside 'start()' brackets.
+     */
     def sequence[A](in: List[Future[A]]): Future[List[A]] =
       Future.sequence(in)
     def start[A](create: => Future[A])(implicit ec: ExecutionContext): Future[Fiber[Future, A]] = {

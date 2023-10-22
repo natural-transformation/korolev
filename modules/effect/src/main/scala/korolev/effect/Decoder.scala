@@ -83,14 +83,14 @@ object Decoder {
   sealed trait Action[+From, +To]
 
   object Action {
-    case class Push[+To](value: To) extends Action[Nothing, To]
-    case class PushFinish[+To](value: To) extends Action[Nothing, To]
-    case class Fork[+From, +To](value: To, takeBack: From) extends Action[From, To]
+    case class Push[+To](value: To)                              extends Action[Nothing, To]
+    case class PushFinish[+To](value: To)                        extends Action[Nothing, To]
+    case class Fork[+From, +To](value: To, takeBack: From)       extends Action[From, To]
     case class ForkFinish[+From, +To](value: To, takeBack: From) extends Action[From, To]
-    case class TakeBack[+From](value: From) extends Action[From, Nothing]
-    case class TakeBackFinish[+From](value: From) extends Action[From, Nothing]
-    case object TakeNext extends Action[Nothing, Nothing]
-    case object Finish extends Action[Nothing, Nothing]
+    case class TakeBack[+From](value: From)                      extends Action[From, Nothing]
+    case class TakeBackFinish[+From](value: From)                extends Action[From, Nothing]
+    case object TakeNext                                         extends Action[Nothing, Nothing]
+    case object Finish                                           extends Action[Nothing, Nothing]
   }
 
   def apply[F[_]: Effect, A](upstream: Stream[F, A]): Decoder[F, A] =

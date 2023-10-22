@@ -1,8 +1,7 @@
 package korolev.effect
 
-import korolev.effect.syntax._
-
 import java.util.concurrent.atomic.AtomicReference
+import korolev.effect.syntax._
 import scala.annotation.tailrec
 import scala.collection.immutable.TreeSet
 import scala.concurrent.duration.FiniteDuration
@@ -10,12 +9,13 @@ import scala.concurrent.duration.FiniteDuration
 /**
  * Asynchronous non-blocking resource pool with lifetime control.
  */
-class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
-                                                       factory: => F[T],
-                                                       currentNanos: () => F[Long],
-                                                       maxCount: Int,
-                                                       maxIdleTime: FiniteDuration)
-                                                      (implicit reporter: Reporter) {
+class AsyncResourcePool[F[_]: Effect, T: Close[F, *]](
+  name: String,
+  factory: => F[T],
+  currentNanos: () => F[Long],
+  maxCount: Int,
+  maxIdleTime: FiniteDuration
+)(implicit reporter: Reporter) {
 
   import AsyncResourcePool.Borrow
 
@@ -26,7 +26,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
         if (ref.itemIsClosed(value)) {
           // Item is closed.
           // Remove it from closed list and forget.
-          val id = System.identityHashCode(value)
+          val id       = System.identityHashCode(value)
           val newState = ref.copy(closedItems = ref.closedItems - id)
           if (pool.compareAndSet(ref, newState)) {
             //reporter.debug("%s - Closed item finally removed from pool", name)
@@ -36,7 +36,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
         } else {
           if (ref.cbs.isEmpty) {
             // There is no callbacks. Add item back to pool
-            val item = PoolItem(nanos, value)
+            val item     = PoolItem(nanos, value)
             val newState = ref.copy(items = item :: ref.items)
             if (pool.compareAndSet(ref, newState)) {
               //reporter.debug("%s - Item has gave back to pool", name)
@@ -46,7 +46,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
           } else {
             // Callback found. Transfer item to next taker.
             val cb :: restOfCbs = ref.cbs
-            val newState = ref.copy(cbs = restOfCbs)
+            val newState        = ref.copy(cbs = restOfCbs)
             if (pool.compareAndSet(ref, newState)) {
               //reporter.debug("%s - Returned item transferred to next taker", name)
               cb(Right(new BorrowImpl(value)))
@@ -64,16 +64,16 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
     for {
       borrow <- borrow()
       result <- f(borrow.value)
-      _ <- borrow.give()
+      _      <- borrow.give()
     } yield {
       result
     }
 
   /**
    * Borrow item from the pool.
-   * 1. Borrow one of idle items if it exists
-   * 2. Otherwise try to creates one using [[factory]]
-   * 3. If [[maxCount]] is reached, waits until one of borrowed items would given back
+   *   1. Borrow one of idle items if it exists 2. Otherwise try to creates one
+   *      using [[factory]] 3. If [[maxCount]] is reached, waits until one of
+   *      borrowed items would given back
    * @return
    */
   def borrow(): F[Borrow[F, T]] = {
@@ -82,7 +82,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
       // Check value not in closed list
       if (!ref.itemIsClosed(value)) {
         val closedItems = ref.closedItems + System.identityHashCode(value)
-        val items = ref.items.filter(_.value != value)
+        val items       = ref.items.filter(_.value != value)
         val (total, cbs) =
           if (ref.cbs.nonEmpty) {
             // Keep allocated resource count same
@@ -96,7 +96,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
           closedItems = closedItems,
           items = items,
           total = total,
-          cbs = cbs,
+          cbs = cbs
         )
         if (pool.compareAndSet(ref, newState)) {
           ref.cbs.headOption.foreach { cb =>
@@ -108,13 +108,12 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
       }
     }
 
-    def createNew(): F[Borrow[F, T]] = {
+    def createNew(): F[Borrow[F, T]] =
       factory.map { value =>
         //reporter.debug("%s - Resource created", name)
         Close[F, T].onClose(value).runAsync(_ => onCloseLoop(value))
         new BorrowImpl(value)
       }
-    }
 
     Effect[F].promise { cb =>
       @tailrec def loop(): Unit = pool.get() match {
@@ -139,8 +138,7 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
           if (pool.compareAndSet(ref, newState)) {
             //reporter.debug("%s - Pool is empty. Try to create new item, increment total", name)
             createNew().runAsync(cb)
-          }
-          else {
+          } else {
             loop()
           }
       }
@@ -168,10 +166,10 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
       val ref = pool.get
       if (!ref.disposed) {
         if (pool.compareAndSet(ref, ref.copy(disposed = true))) {
-          val token = Right(())
+          val token   = Right(())
           val effects = ref.items.map(item => Close[F, T].close(item.value))
           Effect[F].sequence(effects).flatMap { _ =>
-            Effect[F].delay(ref.disposeCbs.foreach(_ (token)))
+            Effect[F].delay(ref.disposeCbs.foreach(_(token)))
           }
         } else {
           loop()
@@ -187,17 +185,17 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
   def cleanup(): F[Int] = {
     @tailrec
     def loop(nanos: Long): F[Int] = {
-      val ref = pool.get()
+      val ref         = pool.get()
       val itemsFilter = (item: PoolItem) => nanos - item.idle < maxIdleTimeNanos
-      val items = ref.items.filter(itemsFilter)
+      val items       = ref.items.filter(itemsFilter)
 
       if (!items.eq(ref.items)) {
-        val obsolete = ref.items.filterNot(itemsFilter)
+        val obsolete      = ref.items.filterNot(itemsFilter)
         val obsoleteCount = obsolete.length
-        val obsoleteIds = obsolete.map(x => System.identityHashCode(x.value))
-        val closedSet = ref.closedItems ++ obsoleteIds
-        val total = ref.total - obsoleteCount
-        val newValue = ref.copy(total = total, items = items, closedItems = closedSet)
+        val obsoleteIds   = obsolete.map(x => System.identityHashCode(x.value))
+        val closedSet     = ref.closedItems ++ obsoleteIds
+        val total         = ref.total - obsoleteCount
+        val newValue      = ref.copy(total = total, items = items, closedItems = closedSet)
         if (pool.compareAndSet(ref, newValue)) {
           val xs = obsolete.map(item => implicitly[Close[F, T]].close(item.value))
           Effect[F].sequence(xs).map { _ =>
@@ -235,18 +233,20 @@ class AsyncResourcePool[F[_] : Effect, T: Close[F, *]](name: String,
 
   case class PoolItem(idle: Long = 0L, value: T)
 
-  case class PoolState(total: Int = 0,
-                       items: List[PoolItem] = Nil,
-                       cbs: List[Promise] = Nil,
-                       closedItems: TreeSet[Int] = TreeSet.empty,
-                       disposeCbs: List[DisposePromise] = Nil,
-                       disposed: Boolean = false) {
+  case class PoolState(
+    total: Int = 0,
+    items: List[PoolItem] = Nil,
+    cbs: List[Promise] = Nil,
+    closedItems: TreeSet[Int] = TreeSet.empty,
+    disposeCbs: List[DisposePromise] = Nil,
+    disposed: Boolean = false
+  ) {
 
     def itemIsClosed(value: T): Boolean =
       closedItems.contains(System.identityHashCode(value))
   }
 
-  private val pool = new AtomicReference[PoolState](PoolState())
+  private val pool             = new AtomicReference[PoolState](PoolState())
   private val maxIdleTimeNanos = maxIdleTime.toNanos
 }
 
@@ -257,7 +257,7 @@ object AsyncResourcePool {
     def give(): F[Unit]
   }
 
-  implicit def asyncPoolMapClose[F[_] : Effect, K, T]: Close[F, AsyncResourcePool[F, T]] =
+  implicit def asyncPoolMapClose[F[_]: Effect, K, T]: Close[F, AsyncResourcePool[F, T]] =
     new Close[F, AsyncResourcePool[F, T]] {
       def onClose(that: AsyncResourcePool[F, T]): F[Unit] =
         that.onDispose()

@@ -1,7 +1,7 @@
 package korolev.effect.io
 
-import korolev.effect.io.DataSocket.CloseReason
 import korolev.effect.{Close, Effect, Stream}
+import korolev.effect.io.DataSocket.CloseReason
 import korolev.effect.syntax._
 
 trait DataSocket[F[_], B] {
@@ -15,8 +15,8 @@ object DataSocket {
   sealed trait CloseReason
 
   object CloseReason {
-    case object ByPeer extends CloseReason
-    case object StreamCanceled extends CloseReason
+    case object ByPeer             extends CloseReason
+    case object StreamCanceled     extends CloseReason
     case class Error(e: Throwable) extends CloseReason
   }
 

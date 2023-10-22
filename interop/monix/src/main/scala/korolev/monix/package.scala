@@ -16,9 +16,8 @@
 
 package korolev
 
-import _root_.monix.execution.Scheduler
 import _root_.monix.eval.Task
-
+import _root_.monix.execution.Scheduler
 import korolev.effect.Effect
 
 package object monix {

@@ -16,9 +16,8 @@
 
 package korolev.zio
 
-import _root_.zio.{Runtime, ZIO, Unsafe}
+import _root_.zio.{Runtime, Unsafe, ZIO}
 import korolev.effect.Effect
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 

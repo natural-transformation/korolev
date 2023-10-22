@@ -1,9 +1,8 @@
 package korolev
 
+import _root_.scodec.bits.ByteVector
 import java.nio.ByteBuffer
 import java.nio.charset.Charset
-
-import _root_.scodec.bits.ByteVector
 import korolev.data.BytesLike
 
 object scodec {

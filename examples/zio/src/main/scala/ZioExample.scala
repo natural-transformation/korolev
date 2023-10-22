@@ -1,14 +1,13 @@
+import java.net.InetSocketAddress
 import korolev.Context
 import korolev.effect.Effect
+import korolev.server
 import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.server.standalone
 import korolev.state.javaSerialization.*
 import korolev.zio.taskEffectLayer
-import korolev.server.standalone
-import korolev.server
-import zio.*
-
-import java.net.InetSocketAddress
 import scala.concurrent.ExecutionContext.Implicits.global
+import zio.*
 
 object ZioExample extends ZIOAppDefault {
 
@@ -22,20 +21,20 @@ object ZioExample extends ZIOAppDefault {
   val bInput = elementId()
 
   import levsha.dsl._
-  import html._
+  import levsha.dsl.html._
 
   def renderForm(maybeResult: Option[Int]) = optimize {
     form(
       input(
         aInput,
-        name := "a-input",
+        name   := "a-input",
         `type` := "number",
         event("input")(onChange)
       ),
       span("+"),
       input(
         bInput,
-        name := "b-input",
+        name   := "b-input",
         `type` := "number",
         event("input")(onChange)
       ),
@@ -56,19 +55,20 @@ object ZioExample extends ZIOAppDefault {
     val config =
       KorolevServiceConfig[Task, Option[Int], Any](
         stateLoader = StateLoader.default(None),
-        document = maybeResult => optimize {
-          Html(
-            body(renderForm(maybeResult))
-          )
-        }
+        document = maybeResult =>
+          optimize {
+            Html(
+              body(renderForm(maybeResult))
+            )
+          }
       )
     for {
       _ <- ZIO.logInfo(s"Try to start server at $address")
       handler <- standalone.buildServer[Task, Array[Byte]](
-        service = server.korolevService(config),
-        address = address,
-        gracefulShutdown = false
-      )
+                   service = server.korolevService(config),
+                   address = address,
+                   gracefulShutdown = false
+                 )
       _ <- ZIO.unit.forkDaemon *> ZIO.logInfo(s"Server started")
       _ <- handler.awaitShutdown()
     } yield ()

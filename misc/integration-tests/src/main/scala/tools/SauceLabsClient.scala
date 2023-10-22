@@ -1,24 +1,20 @@
 package tools
 
-import java.util.Base64
-
 import akka.actor.ActorSystem
 import akka.http.scaladsl.Http
 import akka.http.scaladsl.model._
 import akka.http.scaladsl.model.headers._
-
+import java.util.Base64
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class SauceLabsClient(userName: String, accessKey: String, jobId: String)(implicit actorSystem: ActorSystem) {
 
-  def setName(name: String): Unit = {
+  def setName(name: String): Unit =
     putToJob(s"""{"name": "$name"}""")
-  }
 
-  def setPassed(passed: Boolean): Unit = {
+  def setPassed(passed: Boolean): Unit =
     putToJob(s"""{"passed": $passed}""")
-  }
 
   def putToJob(data: String): Unit = {
     val authorization = {

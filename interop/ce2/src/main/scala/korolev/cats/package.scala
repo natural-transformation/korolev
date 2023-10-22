@@ -20,9 +20,8 @@ import _root_.cats.Traverse
 import _root_.cats.effect._
 import _root_.cats.instances.list._
 import korolev.effect.{Effect => KEffect}
-
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future, blocking => futureBlocking}
+import scala.concurrent.{blocking => futureBlocking, ExecutionContext, Future}
 import scala.util.Try
 
 package object cats {
@@ -55,12 +54,11 @@ package object cats {
       IO.fromTry(value)
 
     def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] =
-      m.start(cs.getOrElseUpdate(ec, IO.contextShift(ec)))
-        .map { fiber =>
-          new KEffect.Fiber[IO, A] {
-            def join(): IO[A] = fiber.join
-          }
+      m.start(cs.getOrElseUpdate(ec, IO.contextShift(ec))).map { fiber =>
+        new KEffect.Fiber[IO, A] {
+          def join(): IO[A] = fiber.join
         }
+      }
 
     def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
       IO.async(cb)
@@ -83,9 +81,8 @@ package object cats {
     def sequence[A](in: List[IO[A]]): IO[List[A]] =
       Traverse[List].sequence(in)
 
-    def runAsync[A](m: IO[A])(callback: Either[Throwable, A] => Unit): Unit = {
+    def runAsync[A](m: IO[A])(callback: Either[Throwable, A] => Unit): Unit =
       m.unsafeRunAsync(callback)
-    }
 
     def run[A](m: IO[A]): Either[Throwable, A] =
       Try(m.unsafeRunSync()).toEither

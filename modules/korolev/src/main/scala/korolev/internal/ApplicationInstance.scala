@@ -17,48 +17,49 @@
 package korolev.internal
 
 import java.util.concurrent.atomic.AtomicInteger
-import korolev.Context.*
-import korolev.effect.syntax.*
 import korolev.*
+import korolev.Context.*
 import korolev.effect.{Effect, Hub, Queue, Reporter, Scheduler, Stream}
+import korolev.effect.syntax.*
 import korolev.internal.Frontend.DomEventMessage
 import korolev.state.{StateDeserializer, StateManager, StateSerializer}
 import korolev.web.{Path, PathAndQuery}
+import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Document, Id, StatefulRenderContext, XmlNs}
-
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
 
-final class ApplicationInstance
-  [
-    F[_]: Effect,
-    S: StateSerializer: StateDeserializer,
-    M
-  ](
-     sessionId: Qsid,
-     val frontend: Frontend[F],
-     stateManager: StateManager[F],
-     initialState: S,
-     render: S => Document.Node[Binding[F, S, M]],
-     rootPath: Path,
-     router: Router[F, S],
-     createMiscProxy: (StatefulRenderContext[Binding[F, S, M]], (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit) => StatefulRenderContext[Binding[F, S, M]],
-     scheduler: Scheduler[F],
-     reporter: Reporter,
-     recovery: PartialFunction[Throwable, S => S],
-     delayedRender: FiniteDuration
-  ) { application =>
+final class ApplicationInstance[
+  F[_]: Effect,
+  S: StateSerializer: StateDeserializer,
+  M
+](
+  sessionId: Qsid,
+  val frontend: Frontend[F],
+  stateManager: StateManager[F],
+  initialState: S,
+  render: S => Document.Node[Binding[F, S, M]],
+  rootPath: Path,
+  router: Router[F, S],
+  createMiscProxy: (
+    StatefulRenderContext[Binding[F, S, M]],
+    (StatefulRenderContext[Binding[F, S, M]], Binding[F, S, M]) => Unit
+  ) => StatefulRenderContext[Binding[F, S, M]],
+  scheduler: Scheduler[F],
+  reporter: Reporter,
+  recovery: PartialFunction[Throwable, S => S],
+  delayedRender: FiniteDuration
+) { application =>
 
   import reporter.Implicit
 
-  private val devMode = new DevMode.ForRenderContext(sessionId.toString)
+  private val devMode          = new DevMode.ForRenderContext(sessionId.toString)
   private val currentRenderNum = new AtomicInteger(0)
-  private val stateQueue = Queue[F, (Id, Any, Option[Effect.Promise[Unit]])]()
-  private val stateHub = Hub(stateQueue.stream)
-  private val messagesQueue = Queue[F, M]()
+  private val stateQueue       = Queue[F, (Id, Any, Option[Effect.Promise[Unit]])]()
+  private val stateHub         = Hub(stateQueue.stream)
+  private val messagesQueue    = Queue[F, M]()
 
   private val renderContext = {
     DiffRenderContext[Binding[F, S, M]](savedBuffer = devMode.loadRenderContext())
@@ -67,7 +68,7 @@ final class ApplicationInstance
   val topLevelComponentInstance: ComponentInstance[F, S, M, S, Any, M] = {
     val eventRegistry = new EventRegistry[F](frontend)
     val component = new Component[F, S, Any, M](initialState, Component.TopLevelComponentId) {
-      def render(parameters: Any, state: S): Document.Node[Binding[F, S, M]] = {
+      def render(parameters: Any, state: S): Document.Node[Binding[F, S, M]] =
         try {
           application.render(state)
         } catch {
@@ -82,12 +83,19 @@ final class ApplicationInstance
               rc.closeNode("html")
             }
         }
-      }
     }
     val componentInstance = new ComponentInstance[F, S, M, S, Any, M](
-      Id.TopLevel, sessionId, frontend, eventRegistry,
-      stateManager, () => currentRenderNum.get(), component,
-      stateQueue, createMiscProxy, scheduler, reporter,
+      Id.TopLevel,
+      sessionId,
+      frontend,
+      eventRegistry,
+      stateManager,
+      () => currentRenderNum.get(),
+      component,
+      stateQueue,
+      createMiscProxy,
+      scheduler,
+      reporter,
       { case ex: Throwable =>
         topLevelComponentInstance.browserAccess.transition(recovery(ex))
       }
@@ -97,8 +105,8 @@ final class ApplicationInstance
   }
 
   /**
-    * If dev mode is enabled save render context
-    */
+   * If dev mode is enabled save render context
+   */
   private def saveRenderContextIfNecessary(): F[Unit] =
     if (devMode.isActive) Effect[F].delay(devMode.saveRenderContext(renderContext))
     else Effect[F].unit
@@ -106,41 +114,38 @@ final class ApplicationInstance
   private def nextRenderNum(): F[Int] =
     Effect[F].delay(currentRenderNum.incrementAndGet())
 
-  private def onState(maybeRenderCallback: Seq[Effect.Promise[Unit]]): F[Unit] = {
+  private def onState(maybeRenderCallback: Seq[Effect.Promise[Unit]]): F[Unit] =
     for {
       snapshot <- stateManager.snapshot
       // Set page url if router exists
       _ <- router.fromState
-        .lift(snapshot(Id.TopLevel).getOrElse(initialState))
-        .fold(Effect[F].unit)(uri => frontend.changePageUrl(rootPath ++ uri))
+             .lift(snapshot(Id.TopLevel).getOrElse(initialState))
+             .fold(Effect[F].unit)(uri => frontend.changePageUrl(rootPath ++ uri))
       _ <- Effect[F].delay {
-        // Prepare render context
-        renderContext.swap()
-        // Perform rendering
-        topLevelComponentInstance.applyRenderContext(
-          parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
-          snapshot = snapshot,
-          rc = renderContext
-        )
-      }
+             // Prepare render context
+             renderContext.swap()
+             // Perform rendering
+             topLevelComponentInstance.applyRenderContext(
+               parameters = (), // Boxed unit as parameter. Top level component doesn't need parameters
+               snapshot = snapshot,
+               rc = renderContext
+             )
+           }
       // Infer and perform changes
       _ <- frontend.performDomChanges(renderContext.diff)
       _ <- saveRenderContextIfNecessary()
       // Make korolev ready to next render
       renderNum <- nextRenderNum()
-      _ <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
-      _ <- frontend.setRenderNum(renderNum)
-      _ = maybeRenderCallback.foreach(_(Right(())))
+      _         <- Effect[F].delay(topLevelComponentInstance.dropObsoleteMisc())
+      _         <- frontend.setRenderNum(renderNum)
+      _          = maybeRenderCallback.foreach(_(Right(())))
     } yield ()
-  }
-
 
   private def onHistory(pq: PathAndQuery): F[Unit] =
     stateManager
       .read[S](Id.TopLevel)
       .flatMap { maybeTopLevelState =>
-        router
-          .toState
+        router.toState
           .lift(pq)
           .fold(Effect[F].delay(Option.empty[S]))(_(maybeTopLevelState.getOrElse(initialState)).map(Some(_)))
       }
@@ -168,9 +173,8 @@ final class ApplicationInstance
 
   val stateStream: F[Stream[F, (Id, Any)]] =
     stateHub.newStream().map { stream =>
-      stream.map {
-        case (id, state, _) =>
-          (id, state)
+      stream.map { case (id, state, _) =>
+        (id, state)
       }
     }
 
@@ -195,9 +199,9 @@ final class ApplicationInstance
     def render(performDiff: (ChangesPerformer => Unit) => F[Unit]) =
       for {
         snapshot <- stateManager.snapshot
-        _ <- Effect[F].delay(topLevelComponentInstance.applyRenderContext((), renderContext, snapshot))
-        _ <- performDiff(renderContext.diff)
-        _ <- saveRenderContextIfNecessary()
+        _        <- Effect[F].delay(topLevelComponentInstance.applyRenderContext((), renderContext, snapshot))
+        _        <- performDiff(renderContext.diff)
+        _        <- saveRenderContextIfNecessary()
       } yield ()
 
     if (devMode.saved) {
@@ -226,28 +230,24 @@ final class ApplicationInstance
         _ <- reloadCssIfNecessary()
         _ <- render(f => Effect[F].delay(f(DiffRenderContext.DummyChangesPerformer)))
         // Start handlers
-        _ <- frontend
-          .browserHistoryMessages
-          .foreach(onHistory)
-          .start
-        _ <- frontend
-          .domEventMessages
-          .foreach(onEvent)
-          .start
+        _ <- frontend.browserHistoryMessages
+               .foreach(onHistory)
+               .start
+        _ <- frontend.domEventMessages
+               .foreach(onEvent)
+               .start
         _ <- if (delayedRender.toMillis > 0) {
-          internalStateStream
-            .buffer(delayedRender)
-            .foreach { xs =>
-              onState(xs.flatMap(_._3))
-            }
-            .start
-        } else {
-          internalStateStream
-            .foreach { xs =>
-              onState(xs._3.toSeq)
-            }
-            .start
-        }
+               internalStateStream
+                 .buffer(delayedRender)
+                 .foreach { xs =>
+                   onState(xs.flatMap(_._3))
+                 }
+                 .start
+             } else {
+               internalStateStream.foreach { xs =>
+                 onState(xs._3.toSeq)
+               }.start
+             }
         // Init component
         _ <- topLevelComponentInstance.initialize()
       } yield ()

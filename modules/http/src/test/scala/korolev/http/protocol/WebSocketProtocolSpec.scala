@@ -2,29 +2,28 @@ package korolev.http.protocol
 
 import korolev.data.Bytes
 import korolev.effect.Decoder
-import korolev.web.PathAndQuery.Root
 import korolev.web.{Request, Response}
+import korolev.web.PathAndQuery.Root
 import org.scalatest.Assertion
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import scala.annotation.tailrec
 import scala.util.Random
 
 class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
 
-  final val webSocketProtocol = new WebSocketProtocol[Bytes]
+  final val webSocketProtocol     = new WebSocketProtocol[Bytes]
   final val SliceTestFramesNumber = 10
 
   // Example handshake from RFC
-  final val HandshakeKey = "dGhlIHNhbXBsZSBub25jZQ=="
+  final val HandshakeKey    = "dGhlIHNhbXBsZSBub25jZQ=="
   final val HandshakeAccept = "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
   final val HandshakeRequest = Request(
     method = Request.Method.Get,
     pq = Root,
     headers = Seq(
-      "connection" -> "upgrade",
-      "sec-websocket-key" -> HandshakeKey,
+      "connection"            -> "upgrade",
+      "sec-websocket-key"     -> HandshakeKey,
       "sec-websocket-version" -> "13"
     ),
     contentLength = None,
@@ -49,9 +48,9 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
 
   // Example frames from RFC
   final val helloUnmaskedBytes = Bytes(0x81, 0x05, 0x48, 0x65, 0x6c, 0x6c, 0x6f)
-  final val helloMaskedBytes = Bytes(0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58)
-  final val helloFrame = Frame.Text(Bytes.wrap("Hello".getBytes), fin = true)
-  final val helloMask = 0x37fa213d
+  final val helloMaskedBytes   = Bytes(0x81, 0x85, 0x37, 0xfa, 0x21, 0x3d, 0x7f, 0x9f, 0x4d, 0x51, 0x58)
+  final val helloFrame         = Frame.Text(Bytes.wrap("Hello".getBytes), fin = true)
+  final val helloMask          = 0x37fa213d
 
   "encodeFrame" should "produce same bytes as in RFC (https://tools.ietf.org/html/rfc6455) 5.7. unmasked example" in {
     encodeFrame(helloFrame, None) shouldEqual helloUnmaskedBytes
@@ -62,21 +61,21 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
   }
 
   "decodeFrames" should "process example frame (from RFC https://tools.ietf.org/html/rfc6455 5.7)" in {
-    decodeFrame(helloUnmaskedBytes) should matchPattern {
-      case (_, Decoder.Action.Push(`helloFrame`)) => ()
+    decodeFrame(helloUnmaskedBytes) should matchPattern { case (_, Decoder.Action.Push(`helloFrame`)) =>
+      ()
     }
   }
 
   it should "process example frame with mask" in {
-    decodeFrame(helloMaskedBytes) should matchPattern {
-      case (_, Decoder.Action.Push(`helloFrame`)) => ()
+    decodeFrame(helloMaskedBytes) should matchPattern { case (_, Decoder.Action.Push(`helloFrame`)) =>
+      ()
     }
   }
 
   it should "process two frames sequentially" in {
-    val bytes = helloMaskedBytes ++ helloUnmaskedBytes
+    val bytes                                  = helloMaskedBytes ++ helloUnmaskedBytes
     val (_, Decoder.Action.Fork(frame1, rest)) = decodeFrame(bytes)
-    val (_, Decoder.Action.Push(frame2)) = decodeFrame(rest)
+    val (_, Decoder.Action.Push(frame2))       = decodeFrame(rest)
 
     frame1 shouldEqual helloFrame
     frame2 shouldEqual helloFrame
@@ -85,7 +84,8 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
   it should "work properly when frames are sliced" in {
     val random = new Random(3)
     @tailrec def slice(acc: Vector[Bytes], bytes: Bytes, times: Int): Vector[Bytes] =
-      if (times == 0) acc :+ bytes else {
+      if (times == 0) acc :+ bytes
+      else {
         val len = random.nextInt(bytes.length.toInt / 3).toLong + 1
         val lhs = bytes.slice(0, len.toInt)
         val rhs = bytes.slice(len.toInt, bytes.length)
@@ -95,14 +95,16 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
     val encodedFrames = frames.foldLeft(Bytes.empty) { (acc, frame) =>
       acc ++ encodeFrame(frame, None)
     }
-    val slices = slice(Vector.empty, encodedFrames, (SliceTestFramesNumber * 1.5).toInt)
+    val slices     = slice(Vector.empty, encodedFrames, (SliceTestFramesNumber * 1.5).toInt)
     val fsmInitial = (Bytes.empty, DecodingState.Begin: DecodingState, Vector.empty[Frame[Bytes]])
 
     @tailrec
-    def decodeSlice(buffer: Bytes,
-                    state: DecodingState,
-                    acc: Vector[Frame[Bytes]],
-                    slice: Bytes): (Bytes, DecodingState, Vector[Frame[Bytes]]) =
+    def decodeSlice(
+      buffer: Bytes,
+      state: DecodingState,
+      acc: Vector[Frame[Bytes]],
+      slice: Bytes
+    ): (Bytes, DecodingState, Vector[Frame[Bytes]]) =
       decodeFrames(buffer, state, slice) match {
         case ((newBuffer, newState), Decoder.Action.Push(frame)) =>
           (newBuffer, newState, acc :+ frame)
@@ -114,9 +116,8 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
       }
 
     // Decode slices
-    val (_, _, decodedFrames) = slices.foldLeft(fsmInitial) {
-      case ((buffer, state, acc), slice) =>
-        decodeSlice(buffer, state, acc, slice)
+    val (_, _, decodedFrames) = slices.foldLeft(fsmInitial) { case ((buffer, state, acc), slice) =>
+      decodeSlice(buffer, state, acc, slice)
     }
 
     decodedFrames shouldEqual frames
@@ -165,11 +166,11 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
    */
   private def isoCheck(size: Int, masked: Boolean): Assertion = {
     val random = new Random(0)
-    val frame = randomFrame(random, size)
-    val mask = if (masked) Some(random.nextInt()) else None
-    val bytes = encodeFrame(frame, mask)
-    decodeFrame(bytes) should matchPattern {
-      case (_, Decoder.Action.Push(`frame`)) => ()
+    val frame  = randomFrame(random, size)
+    val mask   = if (masked) Some(random.nextInt()) else None
+    val bytes  = encodeFrame(frame, mask)
+    decodeFrame(bytes) should matchPattern { case (_, Decoder.Action.Push(`frame`)) =>
+      ()
     }
   }
 }

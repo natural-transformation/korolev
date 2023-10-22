@@ -1,10 +1,9 @@
 import korolev.Context
 import korolev.Context.ElementId
-import korolev.testkit.{Action, Browser}
 import korolev.state.javaSerialization._
+import korolev.testkit.{Action, Browser}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import scala.concurrent.Future
 
 class BrowserSpec extends AsyncFlatSpec with Matchers {
@@ -21,10 +20,12 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
     val e1 = new ElementId(Some("e1"))
     Browser()
       .property(e1, "value", "hello")
-      .access[Future, String, Any]("", access =>
-        access.valueOf(e1).flatMap { v =>
-          access.property(e1).set("value", s"$v world")
-        }
+      .access[Future, String, Any](
+        "",
+        access =>
+          access.valueOf(e1).flatMap { v =>
+            access.property(e1).set("value", s"$v world")
+          }
       )
       .map { actions =>
         actions shouldEqual List(Action.PropertySet(e1, "value", "hello world"))
@@ -61,12 +62,14 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
     Browser()
       .mockJs("function foo() { return 1 }")
       .mockJs("function bar() { return Promise.resolve(2) }")
-      .access[Future, String, Any]("", access =>
-        for {
-          foo <- access.evalJs("foo()")
-          bar <- access.evalJs("bar()")
-          _ <- access.publish(s"$foo $bar")
-        } yield ()
+      .access[Future, String, Any](
+        "",
+        access =>
+          for {
+            foo <- access.evalJs("foo()")
+            bar <- access.evalJs("bar()")
+            _   <- access.publish(s"$foo $bar")
+          } yield ()
       )
       .map { actions =>
         actions shouldEqual List(
@@ -83,7 +86,7 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
 
     import context._
     import levsha.dsl._
-    import html._
+    import levsha.dsl.html._
 
     def onClick(access: Access) =
       access.publish("hello world")
@@ -102,7 +105,7 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
         state = "",
         dom = dom,
         event = "click",
-        target = _.byName("my-button").headOption.map(_.id),
+        target = _.byName("my-button").headOption.map(_.id)
       )
       .map { actions =>
         actions shouldEqual List(Action.Publish("hello world"))

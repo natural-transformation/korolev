@@ -10,8 +10,8 @@ class JsCodeSpec extends AnyFlatSpec with Matchers {
   import JsCode._
 
   "JsCode.apply" should "construct correct list" in {
-    val el1 = new ElementId(Some("el1"))
-    val el2 = new ElementId(Some("el2"))
+    val el1    = new ElementId(Some("el1"))
+    val el2    = new ElementId(Some("el2"))
     val jsCode = JsCode(List("--", "++", "//"), List(el1, el2))
 
     jsCode should equal(Part("--", Element(el1, Part("++", Element(el2, Part("//", End))))))

@@ -13,6 +13,6 @@ target/
 # metals
 .metals
 .bloop
-project/**/metals.sbt
-
+.metals
+*metals.sbt
 .bsp

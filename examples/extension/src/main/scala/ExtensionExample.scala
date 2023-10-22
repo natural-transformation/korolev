@@ -4,7 +4,6 @@ import korolev._
 import korolev.akka._
 import korolev.server._
 import korolev.state.javaSerialization._
-
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
@@ -21,9 +20,10 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
   private val topicListener = Extension.pure[Future, List[String], String] { access =>
     val queueSink = queueSource.runWith(Sink.queue[String])
     def aux(): Future[Unit] = queueSink.pull() flatMap {
-      case Some(message) => access
-        .transition(_ :+ message)
-        .flatMap(_ => aux())
+      case Some(message) =>
+        access
+          .transition(_ :+ message)
+          .flatMap(_ => aux())
       case None =>
         Future.unit
     }
@@ -34,11 +34,11 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
     )
   }
 
-  private def onSubmit(access: Access) = {
+  private def onSubmit(access: Access) =
     for {
       sessionId <- access.sessionId
-      name <- access.valueOf(nameElement)
-      text <- access.valueOf(textElement)
+      name      <- access.valueOf(nameElement)
+      text      <- access.valueOf(textElement)
       userName =
         if (name.trim.isEmpty) s"Anonymous #${sessionId.hashCode().toHexString}"
         else name
@@ -47,7 +47,6 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
         else access.publish(s"$userName: $text")
       _ <- access.property(textElement).set("value", "")
     } yield ()
-  }
 
   private val nameElement = elementId()
   private val textElement = elementId()
@@ -58,7 +57,7 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
     document = { message =>
 
       import levsha.dsl._
-      import html._
+      import levsha.dsl.html._
 
       optimize {
         Html(

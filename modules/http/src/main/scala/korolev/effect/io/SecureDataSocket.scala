@@ -1,19 +1,18 @@
 package korolev.effect.io
 
+import java.nio.ByteBuffer
+import java.util.concurrent.Executor
+import javax.net.ssl.{SSLEngine, SSLHandshakeException}
+import javax.net.ssl.SSLEngineResult.{HandshakeStatus, Status}
 import jdk.jshell.spi.ExecutionControl.NotImplementedException
 import korolev.data.BytesLike
 import korolev.effect
 import korolev.effect.Effect
 import korolev.effect.syntax._
-
-import java.nio.ByteBuffer
-import java.util.concurrent.Executor
-import javax.net.ssl.SSLEngineResult.{HandshakeStatus, Status}
-import javax.net.ssl.{SSLEngine, SSLHandshakeException}
 import scala.collection.mutable
 
-class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
-                                                            socket: RawDataSocket[F, B]) extends DataSocket[F, B] {
+class SecureDataSocket[F[_]: Effect, B: BytesLike] private (engine: SSLEngine, socket: RawDataSocket[F, B])
+    extends DataSocket[F, B] {
 
   import SecureDataSocket.UnwrapStatus
 
@@ -57,13 +56,13 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
   def onClose(): F[DataSocket.CloseReason] =
     socket.onClose()
 
-  private val appBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getApplicationBufferSize)
-  @volatile private var netBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getPacketBufferSize)
+  private val appBuffer: ByteBuffer               = ByteBuffer.allocate(engine.getSession.getApplicationBufferSize)
+  @volatile private var netBuffer: ByteBuffer     = ByteBuffer.allocate(engine.getSession.getPacketBufferSize)
   @volatile private var peerAppBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getApplicationBufferSize)
   @volatile private var peerNetBuffer: ByteBuffer = ByteBuffer.allocate(engine.getSession.getPacketBufferSize)
-  @volatile private var canceled = false
+  @volatile private var canceled                  = false
 
-  private def enlargeBuffer(buffer: ByteBuffer, newRemaining: Int) = {
+  private def enlargeBuffer(buffer: ByteBuffer, newRemaining: Int) =
     if (buffer.capacity() < newRemaining) {
       val newBuffer = ByteBuffer.allocate(buffer.remaining() + newRemaining)
       buffer.flip()
@@ -72,7 +71,6 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
     } else {
       buffer
     }
-  }
 
   private def handshake(blockingExecutor: Executor): F[Unit] = {
 
@@ -82,23 +80,23 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
         Effect[F].unit
       case HandshakeStatus.NEED_WRAP =>
         doWrap() flatMap {
-          case true => handshakeLoop(engine.getHandshakeStatus)
+          case true  => handshakeLoop(engine.getHandshakeStatus)
           case false => throw new SSLHandshakeException("Invalid wrap status. CLOSED given but OK expected")
         }
       case HandshakeStatus.NEED_UNWRAP =>
         doUnwrap().flatMap {
           case UnwrapStatus.Ok => handshakeLoop(engine.getHandshakeStatus)
-          case UnwrapStatus.ClosedByPeer => throw new SSLHandshakeException("Peer has closed connection during handshake")
-          case UnwrapStatus.ClosedByEngine => throw new SSLHandshakeException("Invalid unwrap status. CLOSED given but OK expected")
+          case UnwrapStatus.ClosedByPeer =>
+            throw new SSLHandshakeException("Peer has closed connection during handshake")
+          case UnwrapStatus.ClosedByEngine =>
+            throw new SSLHandshakeException("Invalid unwrap status. CLOSED given but OK expected")
         }
       case HandshakeStatus.NEED_TASK =>
         val effects = getDelegatedTasks.map { task =>
           Effect[F].promise[Unit] { cb =>
-            blockingExecutor.execute {
-              () => {
-                task.run()
-                cb(Right(()))
-              }
+            blockingExecutor.execute { () =>
+              task.run()
+              cb(Right(()))
             }
           }
         }
@@ -134,32 +132,33 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
           case _ => Effect[F].pure(true)
         }
       }
-      result <- if (!hasData) Effect[F].pure(UnwrapStatus.ClosedByPeer) else {
-        peerNetBuffer.flip()
-        val result = engine.unwrap(peerNetBuffer, peerAppBuffer)
-        peerNetBuffer.compact()
-        result.getStatus match {
-          case Status.OK => Effect[F].pure(UnwrapStatus.Ok)
-          case Status.CLOSED => Effect[F].pure(UnwrapStatus.ClosedByEngine)
-          case Status.BUFFER_UNDERFLOW =>
-            peerNetBuffer = enlargeBuffer(peerNetBuffer, engine.getSession.getPacketBufferSize)
-            socket
-              .read(peerNetBuffer)
-              .flatMap {
-                case -1 => Effect[F].pure(UnwrapStatus.ClosedByPeer: UnwrapStatus)
-                case _ => doUnwrap()
-              }
-          case Status.BUFFER_OVERFLOW =>
-            peerAppBuffer = enlargeBuffer(peerAppBuffer, engine.getSession.getApplicationBufferSize)
-            doUnwrap()
-        }
-      }
+      result <- if (!hasData) Effect[F].pure(UnwrapStatus.ClosedByPeer)
+                else {
+                  peerNetBuffer.flip()
+                  val result = engine.unwrap(peerNetBuffer, peerAppBuffer)
+                  peerNetBuffer.compact()
+                  result.getStatus match {
+                    case Status.OK     => Effect[F].pure(UnwrapStatus.Ok)
+                    case Status.CLOSED => Effect[F].pure(UnwrapStatus.ClosedByEngine)
+                    case Status.BUFFER_UNDERFLOW =>
+                      peerNetBuffer = enlargeBuffer(peerNetBuffer, engine.getSession.getPacketBufferSize)
+                      socket
+                        .read(peerNetBuffer)
+                        .flatMap {
+                          case -1 => Effect[F].pure(UnwrapStatus.ClosedByPeer: UnwrapStatus)
+                          case _  => doUnwrap()
+                        }
+                    case Status.BUFFER_OVERFLOW =>
+                      peerAppBuffer = enlargeBuffer(peerAppBuffer, engine.getSession.getApplicationBufferSize)
+                      doUnwrap()
+                  }
+                }
     } yield result
 
   private def getDelegatedTasks: List[Runnable] = {
-    val tasks = mutable.Buffer.empty[Runnable]
+    val tasks          = mutable.Buffer.empty[Runnable]
     var task: Runnable = null
-    while ( {
+    while ({
       task = engine.getDelegatedTask;
       task != null
     }) {
@@ -169,30 +168,33 @@ class SecureDataSocket[F[_] : Effect, B: BytesLike] private(engine: SSLEngine,
     tasks.toList
   }
 
-  private def closeInbound(): Unit = {
+  private def closeInbound(): Unit =
     try {
       engine.closeInbound()
     } catch {
       case _: Throwable =>
-        // Do nothing.
-        // This engine.closeInbound() always throws an exception as I see.
-        // Every implementation invokes engine.closeInbound() on socket close.
+      // Do nothing.
+      // This engine.closeInbound() always throws an exception as I see.
+      // Every implementation invokes engine.closeInbound() on socket close.
     }
-  }
 }
 
 object SecureDataSocket {
 
-  def forClientMode[F[_] : Effect, B: BytesLike](socket: RawDataSocket[F, B],
-                                                 engine: SSLEngine,
-                                                 blockingExecutor: Executor): F[SecureDataSocket[F, B]] = {
+  def forClientMode[F[_]: Effect, B: BytesLike](
+    socket: RawDataSocket[F, B],
+    engine: SSLEngine,
+    blockingExecutor: Executor
+  ): F[SecureDataSocket[F, B]] = {
     engine.setUseClientMode(true)
     apply(socket, engine, blockingExecutor)
   }
 
-  def apply[F[_] : Effect, B: BytesLike](socket: RawDataSocket[F, B],
-                                         engine: SSLEngine,
-                                         blockingExecutor: Executor): F[SecureDataSocket[F, B]] = {
+  def apply[F[_]: Effect, B: BytesLike](
+    socket: RawDataSocket[F, B],
+    engine: SSLEngine,
+    blockingExecutor: Executor
+  ): F[SecureDataSocket[F, B]] = {
     engine.beginHandshake()
     val secureSocket = new SecureDataSocket[F, B](engine, socket)
     secureSocket.handshake(blockingExecutor).as(secureSocket)

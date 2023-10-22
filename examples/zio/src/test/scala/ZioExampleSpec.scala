@@ -1,7 +1,7 @@
 import korolev.effect.Effect
+import korolev.testkit.*
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
-import korolev.testkit.*
 import zio.Task
 
 class ZioExampleSpec extends AsyncFlatSpec with Matchers {
@@ -26,13 +26,11 @@ class ZioExampleSpec extends AsyncFlatSpec with Matchers {
   }
 
   it should "be handled" in Effect[Task].toFuture {
-    browser.event(Option.empty[Int],
-      renderForm(None),
-      "input",
-      _.byName("a-input").headOption.map(_.id)) map { actions =>
-      actions shouldEqual List(
-        Action.Transition(Some(5))
-      )
+    browser.event(Option.empty[Int], renderForm(None), "input", _.byName("a-input").headOption.map(_.id)) map {
+      actions =>
+        actions shouldEqual List(
+          Action.Transition(Some(5))
+        )
     }
   }
 }

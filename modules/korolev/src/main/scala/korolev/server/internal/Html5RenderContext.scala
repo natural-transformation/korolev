@@ -23,7 +23,7 @@ import levsha.RenderContext
 import levsha.impl.TextPrettyPrintingConfig
 
 private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
-  extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
+    extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
 
   override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
@@ -31,7 +31,7 @@ private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
       // Static pages always made from scratch
       component.initialState match {
         case Right(state) => component.render(parameters, state).apply(rc)
-        case Left(_) => component.renderNoState(parameters).apply(rc)
+        case Left(_)      => component.renderNoState(parameters).apply(rc)
       }
     case _ => ()
   }

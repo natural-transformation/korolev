@@ -21,7 +21,6 @@ import _root_.cats.effect._
 import _root_.cats.effect.unsafe.IORuntime
 import _root_.cats.instances.list._
 import korolev.effect.{Effect => KEffect}
-
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
@@ -51,12 +50,11 @@ class IO3Effect(runtime: IORuntime) extends KEffect[IO] {
     IO.fromTry(value)
 
   def start[A](m: => IO[A])(implicit ec: ExecutionContext): IO[KEffect.Fiber[IO, A]] =
-    m.startOn(ec)
-      .map { fiber =>
-        new KEffect.Fiber[IO, A] {
-          def join(): IO[A] = fiber.joinWithNever
-        }
+    m.startOn(ec).map { fiber =>
+      new KEffect.Fiber[IO, A] {
+        def join(): IO[A] = fiber.joinWithNever
       }
+    }
 
   def promise[A](cb: (Either[Throwable, A] => Unit) => Unit): IO[A] =
     IO.async_(cb)

@@ -16,25 +16,23 @@
 
 package korolev.internal
 
+import java.util.concurrent.atomic.AtomicReference
 import korolev.effect.{Effect, Reporter}
 import korolev.effect.syntax._
-
-import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.tailrec
 
 /**
-  * Save information about what type of events are already
-  * listening on the client
-  */
+ * Save information about what type of events are already listening on the
+ * client
+ */
 final class EventRegistry[F[_]: Effect](frontend: Frontend[F])(implicit reporter: Reporter) {
 
   private val knownEventTypes = new AtomicReference(Set("submit"))
 
   /**
-    * Notifies client side that he should listen
-    * all events of the type. If event already listening
-    * on the client side, client will be not notified again.
-    */
+   * Notifies client side that he should listen all events of the type. If event
+   * already listening on the client side, client will be not notified again.
+   */
   def registerEventType(`type`: String): Unit = {
     @tailrec
     def aux(): Unit = {
