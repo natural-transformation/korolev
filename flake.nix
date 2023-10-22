@@ -1,33 +1,55 @@
+
 {
   description = "Flake for dev shell";
 
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/master";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     sbtix.url = "github:natural-transformation/sbtix";
+    gitignore = {
+      url = "github:hercules-ci/gitignore.nix";
+      # Use the same nixpkgs
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
-  outputs = { self, nixpkgs, flake-utils, sbtix, mach-nix }:
-    flake-utils.lib.eachDefaultSystem (system:
+  outputs = inputs@{ nixpkgs, flake-parts, sbtix, gitignore, ... }:
+    flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = [ "x86_64-linux" "aarch64-linux" "aarch64-darwin" ];
+      perSystem = { config, self', inputs', pkgs, system, ... }: 
       let
-        sbt-overlay = self: super: {
-          sbt = super.sbt.override { jre = super.jdk; };
+        jdk21-overlay = self: super: {
+          jdk = super.jdk21;
+          jre = super.jdk21;
+          sbt = super.sbt.override { jre = super.jdk21; };
         };
-        pkgs = import nixpkgs {
+        newPkgs = import nixpkgs {
           inherit system;
-          overlays = [ sbt-overlay ];
+          overlays = [ jdk21-overlay ];
         };
-        sbtixPkg = import sbtix { inherit pkgs; };
+        libPath = nixpkgs.lib.makeLibraryPath [ newPkgs.lmdb ];
+        sbtixPkg = import sbtix { pkgs = newPkgs; };
       in {
-        devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
+        packages.default = import ./default.nix { 
+          pkgs = newPkgs; 
+          gitignore = gitignore.lib;
+        };
+
+        devShells.default = newPkgs.mkShell {
+          nativeBuildInputs = with newPkgs; [
             sbt
             sbtixPkg
-            jdk # currently openjdk 19
-            coursier
+            jdk
           ];
-
-          # environment variables go here
+          # environment variables go here:
+          # Set NIX_PATH to make sure the nix-build in `build.sh` produce the same results as `nix build`
+          NIX_PATH = "nixpkgs=${inputs.nixpkgs}"; 
         };
-      });
+      };
+     
+      flake = {
+        # The usual flake attributes can be defined here, including system-
+        # agnostic ones like nixosModule and system-enumerating ones, although
+        # those are more easily expressed in perSystem.
+      };
+    };
 }
