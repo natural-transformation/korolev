@@ -24,6 +24,7 @@ import korolev.server.internal.services._
 import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
 import korolev.web.{Request, Response}
 import korolev.web.Request.Head
+import scala.concurrent.ExecutionContext
 
 package object server {
 
@@ -39,9 +40,12 @@ package object server {
     config: KorolevServiceConfig[F, S, M]
   ): KorolevService[F] = {
 
+    given exeContext: ExecutionContext = config.executionContext
+
     // TODO remove this when render/node fields will be removed
     val actualConfig =
       if (config.document == null) {
+
         config.copy(document = { (state: S) =>
           import levsha.dsl._
           import levsha.dsl.html._
@@ -51,21 +55,20 @@ package object server {
               config.render(state)
             )
           }
-        })(config.executionContext)
+        })
       } else {
         config
       }
 
-    import config.executionContext
-
-    val commonService    = new CommonService[F]()
-    val filesService     = new FilesService[F](commonService)
-    val pageService      = new PageService[F, S, M](actualConfig)
-    val sessionsService  = new SessionsService[F, S, M](actualConfig, pageService)
-    val messagingService = new MessagingService[F](actualConfig.reporter, commonService, sessionsService)
-    val formDataCodec    = new FormDataCodec(actualConfig.maxFormDataEntrySize)
-    val postService      = new PostService[F](actualConfig.reporter, sessionsService, commonService, formDataCodec)
-    val ssrService       = new ServerSideRenderingService[F, S, M](sessionsService, pageService, actualConfig)
+    val commonService   = new CommonService[F]()
+    val filesService    = new FilesService[F](commonService)
+    val pageService     = new PageService[F, S, M](actualConfig)
+    val sessionsService = new SessionsService[F, S, M](actualConfig, pageService)
+    val messagingService =
+      new MessagingService[F](actualConfig.reporter, commonService, sessionsService, config.compressionSupport)
+    val formDataCodec = new FormDataCodec
+    val postService   = new PostService[F](actualConfig.reporter, sessionsService, commonService, formDataCodec)
+    val ssrService    = new ServerSideRenderingService[F, S, M](sessionsService, pageService, actualConfig)
 
     new KorolevServiceImpl[F](
       config.http,

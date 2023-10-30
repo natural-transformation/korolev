@@ -17,6 +17,7 @@
 package korolev.server
 
 import korolev.{Context, Extension, Router}
+import korolev.data.Bytes
 import korolev.effect.{Effect, Reporter}
 import korolev.state.IdGenerator
 import korolev.web.{Path, PathAndQuery}
@@ -37,18 +38,19 @@ case class KorolevServiceConfig[F[_], S, M](
   @deprecated("Add head() tag to `document`. Do not use `head` and `document` together.", "0.16.0") head: S => Seq[
     Document.Node[Context.Binding[F, S, M]]
   ] = (_: S) => Seq.empty,
-  document: S => Document.Node[Context.Binding[F, S, M]] = null, // TODO (_: S) => levsha.dsl.html.Html(),
+  document: S => Document.Node[Context.Binding[F, S, M]] =
+    (_: S) => levsha.dsl.html.Html(), // TODO (_: S) => levsha.dsl.html.Html(),
   connectionLostWidget: Document.Node[Context.Binding[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Binding[F, S, M]],
-  maxFormDataEntrySize: Int = 1024 * 8,
   extensions: List[Extension[F, S, M]] = Nil,
   idGenerator: IdGenerator[F] = IdGenerator.default[F](),
   heartbeatInterval: FiniteDuration = 5.seconds,
   reporter: Reporter = Reporter.PrintReporter,
   recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
   sessionIdleTimeout: FiniteDuration = 60.seconds,
-  delayedRender: FiniteDuration = 0.seconds
-)(implicit val executionContext: ExecutionContext)
+  delayedRender: FiniteDuration = 0.seconds,
+  compressionSupport: Option[DeflateCompressionService[F]] = None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
+)(using val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {
 
@@ -69,3 +71,8 @@ object KorolevServiceConfig {
     }
   }
 }
+
+case class DeflateCompressionService[F[_]: Effect](
+  decoder: Bytes => F[String],
+  encoder: String => F[Bytes]
+)
