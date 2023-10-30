@@ -36,7 +36,7 @@ class FormDataCodecSpec extends AnyFlatSpec with Matchers {
     """.stripMargin
 
     val bodyBuffer = ByteBuffer.wrap(body.getBytes(StandardCharsets.US_ASCII))
-    val codec      = new FormDataCodec(100500)
+    val codec      = new FormDataCodec
     val formData   = codec.decode(bodyBuffer, "Asrf456BGe4h")
 
     formData.text("DestAddress") should be("brutal-vasya@example.com")
@@ -51,7 +51,7 @@ class FormDataCodecSpec extends AnyFlatSpec with Matchers {
     """.stripMargin
 
     val bodyBuffer = ByteBuffer.wrap(body.getBytes(StandardCharsets.US_ASCII))
-    val codec      = new FormDataCodec(100500)
+    val codec      = new FormDataCodec
     val formData   = codec.decode(bodyBuffer, "----WebKitFormBoundaryVLDwcP1YkcvPtjGM")
 
     formData.bytesOpt("any") should be(None)

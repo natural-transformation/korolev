@@ -20,23 +20,19 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import korolev.web.FormData
 import scala.annotation.tailrec
+import scala.collection.mutable.ArrayBuilder
 
-private[korolev] final class FormDataCodec(maxPartSize: Int) {
+private[korolev] final class FormDataCodec {
 
   import FormDataCodec._
-
-  private val threadLocalBuffer = new ThreadLocal[ByteBuffer] {
-    override def initialValue(): ByteBuffer =
-      ByteBuffer.allocate(maxPartSize)
-  }
 
   def decode(source: ByteBuffer, boundary: String): FormData = {
 
     val boundaryWithBreaks = s"\n--$boundary\n"
     val end                = s"\n--$boundary--\n"
-    val buffer             = threadLocalBuffer.get()
 
-    buffer.clear()
+    // Initialize dynamic buffer using ArrayBuilder
+    val buffer = ArrayBuilder.make[Byte]
 
     // Check the delimiter is reached
     def checkDelimiter(delimiter: String): Boolean = {
@@ -61,14 +57,11 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
     type Entries = List[FormData.Entry]
     type Headers = List[(String, String)]
 
-    def loop(entries: Entries, headers: Headers, state: DecoderState): Entries = {
+    def loop(buffer: ArrayBuilder[Byte], entries: Entries, headers: Headers, state: DecoderState): Entries = {
 
       def updateEntries() = {
         val content = {
-          val bytes = new Array[Byte](buffer.position)
-          buffer.rewind()
-          buffer.get(bytes)
-          buffer.clear()
+          val bytes = buffer.result()
           ByteBuffer.wrap(bytes)
         }
         val nameOpt = headers collectFirst {
@@ -85,35 +78,36 @@ private[korolev] final class FormDataCodec(maxPartSize: Int) {
           val newEntry = FormData.Entry(name, content, headers)
           newEntry :: entries
         }
+
       }
 
       state match {
         case _ if source.position() == source.limit() =>
           List.empty[FormData.Entry]
-        case Buffering if checkDelimiter(end) => updateEntries()
+        case Buffering if checkDelimiter(end) =>
+          updateEntries()
         case Buffering if checkDelimiter(boundaryWithBreaks) =>
-          val ue = updateEntries()
-          loop(ue, Nil, Headers)
+          val updatedEntries = updateEntries()
+          buffer.clear()
+          loop(buffer, updatedEntries, Nil, Headers)
         case Headers if checkDelimiter("\n\n") =>
-          val bytes = new Array[Byte](buffer.position)
-          buffer.rewind()
-          buffer.get(bytes)
+          val bytes      = buffer.result()
           val rawHeaders = new String(bytes, StandardCharsets.ISO_8859_1)
-          val headers = rawHeaders.split('\n').toList.collect {
+          val newHeaders = rawHeaders.split('\n').toList.collect {
             case line if line.contains(":") =>
               val Array(key, value) = line.split(":", 2)
               key.trim -> value.trim
           }
           buffer.clear()
-          loop(entries, headers, Buffering)
+          loop(buffer, entries, newHeaders, Buffering)
         case Buffering | Headers =>
-          buffer.put(source.get())
-          loop(entries, headers, state)
+          buffer += source.get()
+          loop(buffer, entries, headers, state)
       }
     }
 
     checkDelimiter(s"--$boundary\n")
-    FormData(loop(Nil, Nil, Headers))
+    FormData(loop(buffer, Nil, Nil, Headers))
   }
 }
 

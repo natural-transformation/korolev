@@ -94,8 +94,7 @@ object FormDataExample extends SimpleAkkaHttpKorolevApp(AkkaHttpServerConfig(max
             }
           )
         )
-      },
-      maxFormDataEntrySize = 1024 * 1024 * 20
+      }
     )
   }
 }
