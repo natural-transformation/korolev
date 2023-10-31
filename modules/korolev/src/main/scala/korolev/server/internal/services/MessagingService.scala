@@ -99,7 +99,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
 
     // Concatenate all the blocks to form the final decompressed string
     val finalOutputArray = outputBlocks.flatten.toArray
-    new String(finalOutputArray, 0, totalBytesInflated, StandardCharsets.UTF_8)
+    Effect[F].pure(new String(finalOutputArray, 0, totalBytesInflated, StandardCharsets.UTF_8))
   }
 
   private lazy val wsJsonDeflateEncoder = (message: String) => {
@@ -135,11 +135,11 @@ private[korolev] final class MessagingService[F[_]: Effect](
     val compressedArray = outputBlocks.flatten.toArray
 
     // Convert it back to korolev.data.Bytes
-    Bytes.wrap(compressedArray)
+    Effect[F].pure(Bytes.wrap(compressedArray))
   }
 
-  private val defaultDecoder = (bytes: Bytes) => Effect[F].pure(bytes.asUtf8String)
-  private val defaultEncoder = (message: String) => Effect[F].pure(BytesLike[Bytes].utf8(message))
+  private val wsJsonDecoder = (bytes: Bytes) => Effect[F].pure(bytes.asUtf8String)
+  private val wsJsonEncoder = (message: String) => Effect[F].pure(BytesLike[Bytes].utf8(message))
 
   def webSocketMessaging(
     qsid: Qsid,
@@ -155,10 +155,10 @@ private[korolev] final class MessagingService[F[_]: Effect](
           case Some(DeflateCompressionService(decoder, encoder)) => 
             (ProtocolJsonDeflate, decoder, encoder)
           case None => 
-            (ProtocolJsonDeflate, defaultDecoder, defaultEncoder)
+            (ProtocolJsonDeflate, wsJsonDeflateDecoder, wsJsonDeflateEncoder)
         }
       } else {
-        (ProtocolJson, defaultDecoder, defaultEncoder)
+        (ProtocolJson, wsJsonDecoder, wsJsonEncoder)
       }
     }
     sessionsService.createAppIfNeeded(qsid, rh, incomingMessages.mapAsync(decoder)) flatMap { _ =>
