@@ -49,7 +49,8 @@ case class KorolevServiceConfig[F[_], S, M](
   recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
   sessionIdleTimeout: FiniteDuration = 60.seconds,
   delayedRender: FiniteDuration = 0.seconds,
-  compressionSupport: Option[DeflateCompressionService[F]] = None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
+  compressionSupport: Option[DeflateCompressionService[F]] =
+    None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
 )(using val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {

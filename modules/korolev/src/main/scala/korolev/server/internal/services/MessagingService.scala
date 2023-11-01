@@ -78,18 +78,18 @@ private[korolev] final class MessagingService[F[_]: Effect](
   private lazy val deflaters = ThreadLocal.withInitial(() => new Deflater(Deflater.DEFAULT_COMPRESSION, true))
 
   private lazy val wsJsonDeflateDecoder = (bytes: Bytes) => {
-    val inflater = inflaters.get()
+    val inflater   = inflaters.get()
     val inputArray = bytes.asArray
 
-    val chunkSize = 1024 // Choose a reasonable size
-    val outputBlocks = new ListBuffer[Array[Byte]]()
+    val chunkSize          = 1024
+    val outputBlocks       = new ListBuffer[Array[Byte]]()
     var totalBytesInflated = 0
 
     inflater.reset()
     inflater.setInput(inputArray)
 
     while (!inflater.finished()) {
-      val outputArray = new Array[Byte](chunkSize)
+      val outputArray   = new Array[Byte](chunkSize)
       val bytesInflated = inflater.inflate(outputArray)
       totalBytesInflated += bytesInflated
 
@@ -103,7 +103,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
   }
 
   private lazy val wsJsonDeflateEncoder = (message: String) => {
-    val encoder = StandardCharsets.UTF_8.newEncoder()
+    val encoder  = StandardCharsets.UTF_8.newEncoder()
     val deflater = deflaters.get()
 
     // Initialize input as a byte array from the string
@@ -115,9 +115,6 @@ private[korolev] final class MessagingService[F[_]: Effect](
     // Set the input data for the deflater
     deflater.setInput(inputArray)
     deflater.finish()
-
-    // Initialize a byte array for output
-    val outputArray = new Array[Byte](inputArray.length)
 
     // Temporary buffer to hold deflation result
     val tempOutputArray = new Array[Byte](1024)
@@ -152,9 +149,9 @@ private[korolev] final class MessagingService[F[_]: Effect](
       // it can decompress the messages.
       if (protocols.contains(ProtocolJsonDeflate)) {
         compressionSupport match {
-          case Some(DeflateCompressionService(decoder, encoder)) => 
+          case Some(DeflateCompressionService(decoder, encoder)) =>
             (ProtocolJsonDeflate, decoder, encoder)
-          case None => 
+          case None =>
             (ProtocolJsonDeflate, wsJsonDeflateDecoder, wsJsonDeflateEncoder)
         }
       } else {
