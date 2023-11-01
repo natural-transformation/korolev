@@ -417,6 +417,22 @@
       url = "https://repo1.maven.org/maven2/com/michaelpollmeier/versionsort/1.0.11/versionsort-1.0.11.pom";
       sha256 = "A8F20A66EEF99D0B64A6115111E68CB699640CC6D7D9FD3278127ECC4E894171";
     };
+    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-javadoc.jar" = {
+      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-javadoc.jar";
+      sha256 = "AA7324055199A6A80992E50C5E26B1E2D16D09BDEDA5DFA2479CF0DDA394006D";
+    };
+    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-sources.jar" = {
+      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-sources.jar";
+      sha256 = "6A0D74418A237C48008BC9E7DC20814201E1F7E01583D43243EA4314292938DB";
+    };
+    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.jar" = {
+      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.jar";
+      sha256 = "DD8B5C30C079CCE55A9C9EDA4BFDE41B455A9526B8987BA7853155E0AD40A977";
+    };
+    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.pom" = {
+      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.pom";
+      sha256 = "74B698BD7B04596436AF1B7E573F29B44C62660B7044005CDA87D0717ECC6D8C";
+    };
     "nix-public/com/squareup/okhttp3/okhttp-urlconnection/3.7.0/okhttp-urlconnection-3.7.0-javadoc.jar" = {
       url = "https://repo1.maven.org/maven2/com/squareup/okhttp3/okhttp-urlconnection/3.7.0/okhttp-urlconnection-3.7.0-javadoc.jar";
       sha256 = "16A9C9FBD1084C58B08291A8E98648AD37834054529865FA817673E33990FEBE";
@@ -2828,6 +2844,22 @@
     "nix-public/org/scalameta/scalafmt-interfaces/2.6.4/scalafmt-interfaces-2.6.4.pom" = {
       url = "https://repo1.maven.org/maven2/org/scalameta/scalafmt-interfaces/2.6.4/scalafmt-interfaces-2.6.4.pom";
       sha256 = "E7FBB300A5FF656DDC91FC08D5399A6234FA38AF6F7A269EBBF7336C6B514754";
+    };
+    "nix-public/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12-javadoc.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12-javadoc.jar";
+      sha256 = "D653AADE571393B17CF4BF5157A64EBBA0F2D6F2909254CD0E120159E52AECC6";
+    };
+    "nix-public/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12-sources.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12-sources.jar";
+      sha256 = "3CFFECF0EC0EB5FE9E68D911A4E50A62C4C2D255C104D28B0F8A609990B7E530";
+    };
+    "nix-public/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12.jar" = {
+      url = "https://repo1.maven.org/maven2/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12.jar";
+      sha256 = "A98FA307A0AC9665FC7357578D6AEE0559629092A4DE108E9D36AFF307F0A49E";
+    };
+    "nix-public/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12.pom" = {
+      url = "https://repo1.maven.org/maven2/org/scalameta/semanticdb-scalac_2.12.18/4.8.12/semanticdb-scalac_2.12.18-4.8.12.pom";
+      sha256 = "F2F66B14D55468357FA037DA48DAA4B47BB4CF2627606EF3B0DF7BF801D1ADEA";
     };
     "nix-public/org/slf4j/jcl-over-slf4j/1.7.7/jcl-over-slf4j-1.7.7-javadoc.jar" = {
       url = "https://repo1.maven.org/maven2/org/slf4j/jcl-over-slf4j/1.7.7/jcl-over-slf4j-1.7.7-javadoc.jar";

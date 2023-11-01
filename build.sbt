@@ -23,7 +23,9 @@ val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
 
-version := "1.16.0-SNAPSHOT"
+val VERSION = "1.17.0-SNAPSHOT"
+
+version := VERSION
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -53,7 +55,7 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization       := "org.fomkin",
   scalaVersion       := scala3Version,
-  version            := "1.16.0-SNAPSHOT",
+  version            := VERSION,
   scalafmtOnCompile  := false,
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {

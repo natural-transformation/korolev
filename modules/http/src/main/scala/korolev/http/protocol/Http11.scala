@@ -220,37 +220,28 @@ class Http11[B: BytesLike] {
     (bodyBytes, response)
   }
 
-  private val sb = new ThreadLocal[java.lang.StringBuilder]()
-
   def renderResponseHeader(status: Status, headers: Seq[(String, String)]): String = {
-    val builder = {
-      val b = sb.get()
-      if (b == null) {
-        val nb = new java.lang.StringBuilder()
-        sb.set(nb)
-        nb
-      } else {
-        b.setLength(0)
-        b
-      }
-    }
-    //val builder = new java.lang.StringBuilder()
-    //val builder = new StringBuilder()
+    val builder = new java.lang.StringBuilder()
+
     builder
       .append("HTTP/1.1 ")
       .append(status.codeAsString)
       .append(' ')
       .append(status.phrase)
       .append(NewLine)
-    def putHeader(name: String, value: String) = builder
-      .append(name)
-      .append(':')
-      .append(' ')
-      .append(value)
-      .append(NewLine)
+
+    def putHeader(name: String, value: String): Unit =
+      builder
+        .append(name)
+        .append(':')
+        .append(' ')
+        .append(value)
+        .append(NewLine)
+
     headers.foreach { case (name, value) =>
       putHeader(name, value)
     }
+
     builder
       .append(NewLine)
       .toString

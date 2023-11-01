@@ -25,16 +25,19 @@ import korolev.effect.{Effect, Queue, Reporter, Stream}
 import korolev.effect.syntax.*
 import korolev.internal.Frontend
 import korolev.server.{HttpResponse, WebSocketResponse}
+import korolev.server.DeflateCompressionService
 import korolev.server.internal.HttpResponse
 import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable.ListBuffer
 
 private[korolev] final class MessagingService[F[_]: Effect](
   reporter: Reporter,
   commonService: CommonService[F],
-  sessionsService: SessionsService[F, _, _]
+  sessionsService: SessionsService[F, _, _],
+  compressionSupport: Option[DeflateCompressionService[F]]
 ) {
 
   import MessagingService._
@@ -73,69 +76,67 @@ private[korolev] final class MessagingService[F[_]: Effect](
 
   private lazy val inflaters = ThreadLocal.withInitial(() => new Inflater(true))
   private lazy val deflaters = ThreadLocal.withInitial(() => new Deflater(Deflater.DEFAULT_COMPRESSION, true))
-  // TODO this buffers is to huge and the may be not enough anyway.
-  private lazy val compressionInputBuffers = ThreadLocal.withInitial(() => ByteBuffer.allocate(1024 * 1024 * 10)) // 10M
-  private lazy val compressionOutputBuffers =
-    ThreadLocal.withInitial(() => ByteBuffer.allocate(1024 * 1024 * 10)) // 10M
 
-  private val wsJsonDeflateDecoder = (bytes: Bytes) => {
-    val inputBuffer  = compressionInputBuffers.get()
-    val outputBuffer = compressionOutputBuffers.get()
-    val inflater     = inflaters.get()
-    inputBuffer.clear()
-    outputBuffer.clear()
+  private lazy val wsJsonDeflateDecoder = (bytes: Bytes) => {
+    val inflater   = inflaters.get()
+    val inputArray = bytes.asArray
+
+    val chunkSize          = 1024
+    val outputBlocks       = new ListBuffer[Array[Byte]]()
+    var totalBytesInflated = 0
+
     inflater.reset()
-    bytes.copyToBuffer(inputBuffer)
-    inputBuffer.flip()
-    inflater.setInput(inputBuffer)
-    inflater.inflate(outputBuffer)
-    outputBuffer.flip()
-    StandardCharsets.UTF_8.decode(outputBuffer).toString
+    inflater.setInput(inputArray)
+
+    while (!inflater.finished()) {
+      val outputArray   = new Array[Byte](chunkSize)
+      val bytesInflated = inflater.inflate(outputArray)
+      totalBytesInflated += bytesInflated
+
+      // Store the block even if partially filled
+      outputBlocks += java.util.Arrays.copyOf(outputArray, bytesInflated)
+    }
+
+    // Concatenate all the blocks to form the final decompressed string
+    val finalOutputArray = outputBlocks.flatten.toArray
+    Effect[F].pure(new String(finalOutputArray, 0, totalBytesInflated, StandardCharsets.UTF_8))
   }
 
-  private val wsJsonDeflateEncoder = (message: String) => {
-    val encoder      = StandardCharsets.UTF_8.newEncoder()
-    val inputBuffer  = compressionInputBuffers.get()
-    val outputBuffer = compressionOutputBuffers.get()
-    val deflatter    = deflaters.get()
-    // Cleanup
-    inputBuffer.clear()
-    outputBuffer.clear()
-    deflatter.reset()
-    //
-    val chars = CharBuffer.wrap(message)
-    encoder.encode(chars, inputBuffer, true)
-    inputBuffer.flip()
-    deflatter.setInput(inputBuffer)
-    deflatter.finish()
-    deflatter.deflate(outputBuffer, Deflater.SYNC_FLUSH)
-    outputBuffer.flip()
-    val array = new Array[Byte](outputBuffer.remaining())
-    outputBuffer.get(array)
-    Bytes.wrap(array)
+  private lazy val wsJsonDeflateEncoder = (message: String) => {
+    val encoder  = StandardCharsets.UTF_8.newEncoder()
+    val deflater = deflaters.get()
 
-//    deflatter.reset()
-//    deflatter.setInput(inputBuffer)
-//    val chars = CharBuffer.wrap(message)
-//    var result = Bytes.empty
-//    while (chars.remaining() > 0) {
-//      inputBuffer.clear()
-//      outputBuffer.clear()
-//      encoder.encode(chars, inputBuffer, false)
-//      inputBuffer.flip()
-//      deflatter.deflate(outputBuffer)
-//      outputBuffer.flip()
-//      val array = new Array[Byte](outputBuffer.remaining())
-//      outputBuffer.get(array)
-//      result = result ++ Bytes.wrap(array)
-//    }
-//    deflatter.finish()
-//    result
+    // Initialize input as a byte array from the string
+    val inputArray = message.getBytes(StandardCharsets.UTF_8)
 
+    // Clear and reset deflater
+    deflater.reset()
+
+    // Set the input data for the deflater
+    deflater.setInput(inputArray)
+    deflater.finish()
+
+    // Temporary buffer to hold deflation result
+    val tempOutputArray = new Array[Byte](1024)
+
+    // Initialize a ListBuffer to hold multiple output blocks
+    var outputBlocks = ListBuffer[Array[Byte]]()
+
+    // Deflate the input in chunks
+    while (!deflater.finished()) {
+      val bytesDeflated = deflater.deflate(tempOutputArray)
+      outputBlocks += java.util.Arrays.copyOf(tempOutputArray, bytesDeflated)
+    }
+
+    // Concatenate all blocks to form the final array
+    val compressedArray = outputBlocks.flatten.toArray
+
+    // Convert it back to korolev.data.Bytes
+    Effect[F].pure(Bytes.wrap(compressedArray))
   }
 
-  private val wsJsonDecoder = (bytes: Bytes) => bytes.asUtf8String
-  private val wsJsonEncoder = (message: String) => BytesLike[Bytes].utf8(message)
+  private val wsJsonDecoder = (bytes: Bytes) => Effect[F].pure(bytes.asUtf8String)
+  private val wsJsonEncoder = (message: String) => Effect[F].pure(BytesLike[Bytes].utf8(message))
 
   def webSocketMessaging(
     qsid: Qsid,
@@ -147,15 +148,20 @@ private[korolev] final class MessagingService[F[_]: Effect](
       // Support for protocol compression. A client can tell us
       // it can decompress the messages.
       if (protocols.contains(ProtocolJsonDeflate)) {
-        (ProtocolJsonDeflate, wsJsonDeflateDecoder, wsJsonDeflateEncoder)
+        compressionSupport match {
+          case Some(DeflateCompressionService(decoder, encoder)) =>
+            (ProtocolJsonDeflate, decoder, encoder)
+          case None =>
+            (ProtocolJsonDeflate, wsJsonDeflateDecoder, wsJsonDeflateEncoder)
+        }
       } else {
         (ProtocolJson, wsJsonDecoder, wsJsonEncoder)
       }
     }
-    sessionsService.createAppIfNeeded(qsid, rh, incomingMessages.map(decoder)) flatMap { _ =>
+    sessionsService.createAppIfNeeded(qsid, rh, incomingMessages.mapAsync(decoder)) flatMap { _ =>
       sessionsService.getApp(qsid) flatMap {
         case Some(app) =>
-          val httpResponse = Response(Status.Ok, app.frontend.outgoingMessages.map(encoder), Nil, None)
+          val httpResponse = Response(Status.Ok, app.frontend.outgoingMessages.mapAsync(encoder), Nil, None)
           Effect[F].pure(WebSocketResponse(httpResponse, selectedProtocol))
         case None =>
           // Respond with reload message because app was not found.
@@ -163,7 +169,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
           // do not have an information about the state which had been
           // applied to render of the page on a client side.
           Stream(Frontend.ReloadMessage).mat().map { messages =>
-            val httpResponse = Response(Status.Ok, messages.map(encoder), Nil, None)
+            val httpResponse = Response(Status.Ok, messages.mapAsync(encoder), Nil, None)
             WebSocketResponse(httpResponse, selectedProtocol)
           }
       }
