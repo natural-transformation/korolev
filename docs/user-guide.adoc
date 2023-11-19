@@ -1,5 +1,4 @@
 = Korolev: Single Page Applications Framework
-
 :source-highlighter: pygments
 :numbered:
 :toc:
@@ -30,7 +29,7 @@ Our project supports static page rendering so that search engines could index pa
 
 You need SBT and JDK 11+ installed. Once installed, run g8 template.
 
-[source,bash]
+[source,console]
 -----------------------------------
 $ sbt new fomkin/korolev.g8
 $ cd mykorolevproject

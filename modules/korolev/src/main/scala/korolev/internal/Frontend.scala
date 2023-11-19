@@ -176,10 +176,10 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def reloadCss(): F[Unit] =
     send(Procedure.ReloadCss.code)
 
-  def extractEventData(eventId: EventId): F[String] =
+  def extractEventData(dem: DomEventMessage): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ExtractEventData.code, descriptor, eventId.target.mkString, eventId.`type`)
+      _ <- send(Procedure.ExtractEventData.code, descriptor, dem.target.mkString, dem.eventType)
       result <- stringPromises.get(descriptor)
     } yield result
 

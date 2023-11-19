@@ -90,7 +90,7 @@ final class ComponentInstance[
 
   @volatile private var eventSubscription = Option.empty[E => _]
 
-  private[korolev] case class BrowserAccess(eventId: EventId) extends BaseAccessDefault[F, CS, E] {
+  private[korolev] case class BrowserAccess(dem: DomEventMessage) extends BaseAccessDefault[F, CS, E] {
 
     private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
@@ -208,13 +208,13 @@ final class ComponentInstance[
     def evalJs(code: JsCode): F[String] =
       frontend.evalJs(code.mkString(unsafeGetId))
 
-    def eventData: F[String] = frontend.extractEventData(eventId)
+    def eventData: F[String] = frontend.extractEventData(dem)
 
     def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
       frontend.registerCustomCallback(name)(f)
   }
 
-  private[korolev] val browserAccess = BrowserAccess(EventId(Id.TopLevel, "init", EventPhase.AtTarget))
+  private[korolev] val browserAccess = BrowserAccess(DomEventMessage(0, Id.TopLevel, "init"))
 
   /**
     * Subscribes to component instance events.
@@ -352,8 +352,8 @@ final class ComponentInstance[
             if (rnMap.getOrElse(k, 0) == dem.eventCounter) {
               val newEventConter = dem.eventCounter + 1
               rnMap.put(k, newEventConter)
-              event.effect(BrowserAccess(eventId))
-                .after(frontend.setEventCounter(eventId.target, eventId.`type`, newEventConter))
+              event.effect(BrowserAccess(dem))
+                .after(frontend.setEventCounter(dem.target, eventId.`type`, newEventConter))
                 .runAsync {
                   case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
                   case _ => () // Do nothing

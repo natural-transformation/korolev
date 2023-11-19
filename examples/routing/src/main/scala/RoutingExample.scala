@@ -56,17 +56,17 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                         if (!todo.done) "checkbox"
                         else "checkbox checkbox__checked"
                       },
-                      // Generate transition when clicking checkboxes
-                      event("click") { access =>
-                        access.transition { s =>
-                          val todos = s.todos(s.selectedTab)
-                          val updated = todos.updated(i, todos(i).copy(done = !todo.done))
-                          s.copy(todos = s.todos + (s.selectedTab -> updated))
-                        }
-                      }
                     ),
                     if (!todo.done) span(todo.text)
-                    else span(textDecoration @= "line-through", todo.text)
+                    else span(textDecoration @= "line-through", todo.text),
+                    event("click") { access =>
+                      // Generate transition when clicking checkboxes
+                      access.transition { s =>
+                        val todos = s.todos(s.selectedTab)
+                        val updated = todos.updated(i, todos(i).copy(done = !todo.done))
+                        s.copy(todos = s.todos + (s.selectedTab -> updated))
+                      }
+                    }
                   )
               }
             ),
