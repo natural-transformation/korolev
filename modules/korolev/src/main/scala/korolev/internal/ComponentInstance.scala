@@ -17,22 +17,33 @@
 package korolev.internal
 
 import korolev.*
-import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
-import korolev.effect.syntax.*
-import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import levsha.{Id, StatefulRenderContext}
-import levsha.events.{EventId, EventPhase}
-
-import scala.collection.mutable
-import Context.*
 import korolev.data.Bytes
+import korolev.effect.Effect
+import korolev.effect.Queue
+import korolev.effect.Reporter
+import korolev.effect.Scheduler
+import korolev.effect.Stream
+import korolev.effect.syntax.*
 import korolev.internal.Frontend.DomEventMessage
-import korolev.util.{JsCode, Lens}
+import korolev.state.StateDeserializer
+import korolev.state.StateManager
+import korolev.state.StateSerializer
+import korolev.util.JsCode
+import korolev.util.Lens
 import korolev.web.FormData
+import levsha.Id
+import levsha.StatefulRenderContext
+import levsha.events.EventId
+import levsha.events.EventPhase
 
+import scala.collection.AbstractMapView
+import scala.collection.MapView
 import scala.collection.concurrent.TrieMap
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
+
+import Context.*
 
 /**
   * Component state holder and effects performer
@@ -338,43 +349,32 @@ final class ComponentInstance[
     pendingEffects.enqueue(effect)
   }
 
-  def applyEvent(eventId: EventId, dem: DomEventMessage, rnMap: TrieMap[(Id, String), Int]): Boolean = {
-    try {
-      events.get(eventId) match {
-        case Some(events: Vector[Event[F, CS, E]]) =>
-          // A user defines the event effect, so we
-          // don't control the time of execution.
-          // We shouldn't block the application if
-          // the user's code waits for something
-          // for a long time.
-          events.forall { event =>
-            val k = (eventId.target, eventId.`type`)
-            if (rnMap.getOrElse(k, 0) == dem.eventCounter) {
-              val newEventConter = dem.eventCounter + 1
-              rnMap.put(k, newEventConter)
-              event.effect(BrowserAccess(dem))
-                .after(frontend.setEventCounter(dem.target, eventId.`type`, newEventConter))
-                .runAsync {
-                  case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
-                  case _ => () // Do nothing
-                }
-              !event.stopPropagation
-            } else {
-              true
-            }
-          }
-        case None =>
-          nestedComponents.values.forall { nested =>
-            nested.applyEvent(eventId, dem, rnMap)
-          }
+  type EventHandlers =  Vector[DomEventMessage => F[Boolean]]
+  type AllEventHandlers = MapView[EventId, EventHandlers]
+
+  def allEventHandlers: AllEventHandlers = MapView.
+    events.view.mapValues { handlers =>
+      handlers.map { handler => (dem: DomEventMessage) =>
+        handler
+          .effect(BrowserAccess(dem))
+          .as(handler.stopPropagation)        
       }
-    } catch {
-      case NonFatal(ex) =>
-        recovery(ex).runAsyncForget
-        // Stop event propagation because error happen
-        false
-    }
-  }
+    } +++ nestedComponents
+      .values
+      .map(_.allEventHandlers)
+      .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
+
+  def eventHandlersFor(eventId: EventId): EventHandlers =
+    events
+      .get(eventId).fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
+        handlers.map { handler => dem =>
+          handler
+            .effect(BrowserAccess(dem))
+            .as(handler.stopPropagation)
+        }
+      } ++ nestedComponents
+      .values
+      .flatMap(_.eventHandlersFor(eventId))
 
   /**
     * Remove all delays and nested component instances

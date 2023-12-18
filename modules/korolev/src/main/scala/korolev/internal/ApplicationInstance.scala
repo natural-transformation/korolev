@@ -16,18 +16,28 @@
 
 package korolev.internal
 
-import java.util.concurrent.atomic.AtomicInteger
 import korolev.Context.*
-import korolev.effect.syntax.*
 import korolev.*
-import korolev.effect.{Effect, Hub, Queue, Reporter, Scheduler, Stream}
+import korolev.effect.Effect
+import korolev.effect.Hub
+import korolev.effect.Queue
+import korolev.effect.Reporter
+import korolev.effect.Scheduler
+import korolev.effect.Stream
+import korolev.effect.syntax.*
 import korolev.internal.Frontend.DomEventMessage
-import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import korolev.web.{Path, PathAndQuery}
-import levsha.events.{EventId, calculateEventPropagation}
+import korolev.state.StateDeserializer
+import korolev.state.StateManager
+import korolev.state.StateSerializer
+import korolev.web.Path
+import korolev.web.PathAndQuery
+import levsha.Document
+import levsha.Id
+import levsha.StatefulRenderContext
+import levsha.XmlNs
+import levsha.events.calculateEventPropagation
 import levsha.impl.DiffRenderContext
 import levsha.impl.DiffRenderContext.ChangesPerformer
-import levsha.{Document, Id, StatefulRenderContext, XmlNs}
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContext
@@ -50,8 +60,8 @@ final class ApplicationInstance
      scheduler: Scheduler[F],
      reporter: Reporter,
      recovery: PartialFunction[Throwable, S => S],
-     delayedRender: FiniteDuration
-  ) { application =>
+     delayedRender: FiniteDuration,
+  )(implicit ec: ExecutionContext) { application =>
 
   import reporter.Implicit
 
@@ -149,13 +159,43 @@ final class ApplicationInstance
           Effect[F].unit
       }
 
-  private def onEvent(dem: DomEventMessage): F[Unit] =
-    Effect[F].delay {
-      calculateEventPropagation(dem.target, dem.eventType) forall { eventId =>
-        topLevelComponentInstance.applyEvent(eventId, dem, eventCounters)
+  private def onEvent(dem: DomEventMessage): F[Unit] = {
+    def aux(effects: List[DomEventMessage => F[Boolean]]): F[Unit] =
+      effects match {
+        case Nil => Effect[F].unit
+        case effect :: xs =>
+          effect(dem).flatMap { stopPropagation =>
+            if (stopPropagation) Effect[F].unit
+            else aux(xs)
+          }
       }
-      ()
-    }
+    val k = (dem.target, dem.eventType)
+    Effect[F]
+      .delay(eventCounters.getOrElse(k, 0)).flatMap { eventCounter => 
+        println(s"processing $dem. eventCounter=$eventCounter, dem.eventCounter=${dem.eventCounter}")
+        if (eventCounter == dem.eventCounter) {
+          val propagation = calculateEventPropagation(dem.target, dem.eventType)
+          val allHandlers = topLevelComponentInstance.allEventHandlers
+          val allEffects = propagation.toList.flatMap(eventId => allHandlers.getOrElse(eventId, Vector.empty))
+          println(s"handlers found: ${allEffects}")
+          if (allEffects.nonEmpty) {
+            for {
+              _ <- aux(allEffects)
+              newEventConter = dem.eventCounter + 1
+              _ <- Effect[F].delay(eventCounters.put(k, newEventConter))
+              _ <- frontend.setEventCounter(dem.target, dem.eventType, newEventConter)
+            } yield ()
+          } else {
+            Effect[F].unit
+          }
+        } else {
+          Effect[F].unit
+        }  
+      } 
+      .recover { case error => reporter.error(s"Unable to process event $dem", error) }
+      .start
+      .unit
+  }
 
   private final val internalStateStream =
     stateHub.newStreamUnsafe()
