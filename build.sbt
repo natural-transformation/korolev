@@ -30,7 +30,7 @@ scalaVersion := scala2_13Version
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
 val crossVersionSettings = Seq(
-  crossScalaVersions := Seq(scala2_12Version, scala2_13Version, scala3Version)
+  crossScalaVersions := Seq(scala2_13Version, scala3Version)
 )
 
 val dontPublishSettings = Seq(

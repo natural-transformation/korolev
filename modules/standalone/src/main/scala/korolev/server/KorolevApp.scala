@@ -1,17 +1,19 @@
 package korolev.server
 
-import java.net.{InetSocketAddress, SocketAddress}
-import java.nio.channels.AsynchronousChannelGroup
-import java.util.concurrent.Executors
-
 import korolev.Context
 import korolev.data.BytesLike
 import korolev.effect.Effect
 import korolev.effect.io.ServerSocket.ServerSocketHandler
 import korolev.effect.syntax._
-import korolev.state.{StateDeserializer, StateSerializer}
+import korolev.state.StateDeserializer
+import korolev.state.StateSerializer
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService}
+import java.net.InetSocketAddress
+import java.net.SocketAddress
+import java.nio.channels.AsynchronousChannelGroup
+import java.util.concurrent.Executors
+import scala.concurrent.ExecutionContext
+import scala.concurrent.ExecutionContextExecutorService
 
 abstract class KorolevApp[
   F[_] : Effect,
@@ -36,6 +38,7 @@ abstract class KorolevApp[
 
   private def addShutdownHook(config: KorolevServiceConfig[F, S, M],
                               handler: ServerSocketHandler[F]) = Effect[F].delay {
+    import config.reporter.Implicit
     Runtime.getRuntime.addShutdownHook(
       new Thread {
         override def run(): Unit = {
@@ -45,7 +48,7 @@ abstract class KorolevApp[
           handler
             .stopServingRequests()
             .after(handler.awaitShutdown())
-            .runSyncForget(config.reporter)
+            .runSyncForget
         }
       }
     )

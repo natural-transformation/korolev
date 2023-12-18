@@ -18,12 +18,16 @@ package korolev.server.internal.services
 
 import korolev.Qsid
 import korolev.data.Bytes
+import korolev.effect.Effect
+import korolev.effect.Reporter
+import korolev.effect.Stream
 import korolev.effect.syntax._
-import korolev.effect.{Effect, Reporter, Stream}
 import korolev.internal.Frontend.DownloadFileMeta
 import korolev.server.HttpResponse
-import korolev.server.internal.{FormDataCodec, HttpResponse}
-import korolev.web.{Headers, Response}
+import korolev.server.internal.FormDataCodec
+import korolev.server.internal.HttpResponse
+import korolev.web.Headers
+import korolev.web.Response
 
 import scala.concurrent.ExecutionContext
 
@@ -41,8 +45,8 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
         _.split(';')
           .toList
           .filter(_.contains('='))
-          .map(_.split('=').map(_.trim))
-          .collectFirst { case Array("boundary", s) => s }
+          .map(_.split('=').toList.map(_.trim))
+          .collectFirst { case "boundary" :: s :: Nil => s }
       }
       .fold(Effect[F].fail[String](new Exception("Content-Type should be `multipart/form-data`")))(Effect[F].pure)
 

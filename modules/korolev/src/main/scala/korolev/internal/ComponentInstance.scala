@@ -352,7 +352,7 @@ final class ComponentInstance[
   type EventHandlers =  Vector[DomEventMessage => F[Boolean]]
   type AllEventHandlers = MapView[EventId, EventHandlers]
 
-  def allEventHandlers: AllEventHandlers = MapView.
+  def allEventHandlers: AllEventHandlers =
     events.view.mapValues { handlers =>
       handlers.map { handler => (dem: DomEventMessage) =>
         handler
@@ -367,7 +367,7 @@ final class ComponentInstance[
   def eventHandlersFor(eventId: EventId): EventHandlers =
     events
       .get(eventId).fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
-        handlers.map { handler => dem =>
+        handlers.map { handler => (dem: DomEventMessage) =>
           handler
             .effect(BrowserAccess(dem))
             .as(handler.stopPropagation)
