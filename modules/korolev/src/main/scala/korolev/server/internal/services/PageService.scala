@@ -30,8 +30,9 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
           s"{interval:$interval}"
       }
     }
-    val presetIds = if (config.presetIds)",kid:true" else ""
-    val kfg = s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds}"
+    val presetIds = if (config.presetIds) ",kid:true" else ""
+    val kfg =
+      s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds}"
 
     rc.openNode(XmlNs.html, "script")
     rc.addTextNode(kfg)
@@ -42,39 +43,37 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
     rc.closeNode("script")
   }
 
-
-  def setupStatefulProxy(rc: StatefulRenderContext[B],
-                         qsid: Qsid,
-                         k: (StatefulRenderContext[B], B) => Unit): StatefulRenderContext[Binding[F, S, M]] = {
-    new StatefulRenderContext[B] with UpgradeHeadRenderContextProxy[B]  { proxy =>
+  def setupStatefulProxy(
+    rc: StatefulRenderContext[B],
+    qsid: Qsid,
+    k: (StatefulRenderContext[B], B) => Unit
+  ): StatefulRenderContext[Binding[F, S, M]] =
+    new StatefulRenderContext[B] with UpgradeHeadRenderContextProxy[B] { proxy =>
       val underlyingRenderContext: RenderContext[B] = rc
-      def upgradeHead(): Unit = appendScripts(rc, qsid)
-      def subsequentId: Id = rc.subsequentId
-      def currentId: Id = rc.currentId
-      def currentContainerId: Id = rc.currentContainerId
-      override def addMisc(misc: B): Unit = k(proxy, misc)
+      def upgradeHead(): Unit                       = appendScripts(rc, qsid)
+      def subsequentId: Id                          = rc.subsequentId
+      def currentId: Id                             = rc.currentId
+      def currentContainerId: Id                    = rc.currentContainerId
+      override def addMisc(misc: B): Unit           = k(proxy, misc)
     }
-  }
 
-  def setupStatelessProxy(rc: RenderContext[B],
-                         qsid: Qsid): RenderContext[Binding[F, S, M]] = {
-    new UpgradeHeadRenderContextProxy[B]  { proxy =>
+  def setupStatelessProxy(rc: RenderContext[B], qsid: Qsid): RenderContext[Binding[F, S, M]] =
+    new UpgradeHeadRenderContextProxy[B] { proxy =>
       val underlyingRenderContext: RenderContext[B] = rc
-      def upgradeHead(): Unit = appendScripts(rc, qsid)
+      def upgradeHead(): Unit                       = appendScripts(rc, qsid)
     }
-  }
 }
 
 object PageService {
 
   trait RenderContextProxy[-M] extends RenderContext[M] {
     def underlyingRenderContext: RenderContext[M]
-    def openNode(xmlns: XmlNs, name: String): Unit = underlyingRenderContext.openNode(xmlns, name)
-    def closeNode(name: String): Unit = underlyingRenderContext.closeNode(name)
+    def openNode(xmlns: XmlNs, name: String): Unit               = underlyingRenderContext.openNode(xmlns, name)
+    def closeNode(name: String): Unit                            = underlyingRenderContext.closeNode(name)
     def setAttr(xmlNs: XmlNs, name: String, value: String): Unit = underlyingRenderContext.setAttr(xmlNs, name, value)
-    def setStyle(name: String, value: String): Unit = underlyingRenderContext.setStyle(name, value)
-    def addTextNode(text: String): Unit = underlyingRenderContext.addTextNode(text)
-    def addMisc(misc: M): Unit = underlyingRenderContext.addMisc(misc)
+    def setStyle(name: String, value: String): Unit              = underlyingRenderContext.setStyle(name, value)
+    def addTextNode(text: String): Unit                          = underlyingRenderContext.addTextNode(text)
+    def addMisc(misc: M): Unit                                   = underlyingRenderContext.addMisc(misc)
   }
 
   trait UpgradeHeadRenderContextProxy[-M] extends RenderContextProxy[M] {
@@ -83,7 +82,7 @@ object PageService {
 
     protected def upgradeHead(): Unit
 
-    override def openNode(xmlNs: XmlNs, name: String): Unit = {
+    override def openNode(xmlNs: XmlNs, name: String): Unit =
       if (!headWasOpened && name == "body" && xmlNs == XmlNs.html) {
         // Head wasn't opened above. It means
         // programmer didn't include head() in the page.
@@ -98,10 +97,8 @@ object PageService {
       } else {
         underlyingRenderContext.openNode(xmlNs, name)
       }
-    }
 
-    override def closeNode(name: String): Unit = {
+    override def closeNode(name: String): Unit =
       underlyingRenderContext.closeNode(name)
-    }
   }
 }

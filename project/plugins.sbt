@@ -8,4 +8,6 @@ addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "1.0.0")
 
 addSbtPlugin("de.heikoseeberger" % "sbt-header" % "5.0.0")
 
+addSbtPlugin("org.scalameta" % "sbt-scalafmt" % "2.4.2")
+
 libraryDependencies += "com.google.javascript" % "closure-compiler" % "v20230802"

@@ -16,25 +16,25 @@
 
 package korolev.server.internal.services
 
-import korolev.effect.syntax.*
+import java.util.concurrent.atomic.AtomicBoolean
+import korolev.{Extension, Qsid}
 import korolev.effect.{AsyncTable, Effect, Hub, Scheduler, Stream, Var}
+import korolev.effect.syntax.*
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.server.KorolevServiceConfig
 import korolev.server.internal.{BadRequestException, Cookies}
 import korolev.state.{StateDeserializer, StateSerializer, StateStorage}
 import korolev.web.Request.Head
-import korolev.{Extension, Qsid}
-
-import java.util.concurrent.atomic.AtomicBoolean
 
 private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
-    config: KorolevServiceConfig[F, S, M],
-    pageService: PageService[F, S, M]) {
+  config: KorolevServiceConfig[F, S, M],
+  pageService: PageService[F, S, M]
+) {
 
   import config.executionContext
   import config.reporter.Implicit
 
-  type App = ApplicationInstance[F, S, M]
+  type App                = ApplicationInstance[F, S, M]
   type ExtensionsHandlers = List[Extension.Handlers[F, S, M]]
 
   private val apps = AsyncTable.unsafeCreateEmpty[F, Qsid, App]
@@ -42,9 +42,9 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
   def initSession(rh: Head): F[Qsid] =
     for {
       deviceId <- rh.cookie(Cookies.DeviceId) match {
-        case Some(d) => Effect[F].pure(d)
-        case None => config.idGenerator.generateDeviceId()
-      }
+                    case Some(d) => Effect[F].pure(d)
+                    case None    => config.idGenerator.generateDeviceId()
+                  }
       sessionId <- config.idGenerator.generateSessionId()
     } yield {
       Qsid(deviceId, sessionId)
@@ -54,8 +54,8 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
     for {
       defaultState <- config.stateLoader(qsid.deviceId, rh)
       state <- config.router.toState
-        .lift(rh.pq)
-        .fold(Effect[F].pure(defaultState))(f => f(defaultState))
+                 .lift(rh.pq)
+                 .fold(Effect[F].pure(defaultState))(f => f(defaultState))
       _ <- stateStorage.create(qsid.deviceId, qsid.sessionId, state)
     } yield state
 
@@ -64,7 +64,7 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
 
   def createAppIfNeeded(qsid: Qsid, rh: Head, incomingStream: Stream[F, String]): F[Unit] = {
     val (incomingConsumed, managedIncomingStream) = incomingStream.handleConsumed
-    val incomingHub: Hub[F, String] = Hub(managedIncomingStream)
+    val incomingHub: Hub[F, String]               = Hub(managedIncomingStream)
 
     def handleAppOrWsOutgoingCloseOrTimeout(frontend: Frontend[F], app: App, ehs: ExtensionsHandlers): F[Unit] = {
 
@@ -77,27 +77,26 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           }
 
         def handleCommunicationTimeout(): F[Unit] = {
-          def createTimeout(stream: Stream[F, String]): F[Scheduler.JobHandler[F, Unit]] = {
+          def createTimeout(stream: Stream[F, String]): F[Scheduler.JobHandler[F, Unit]] =
             scheduler.scheduleOnce(config.sessionIdleTimeout) {
               invokeOnce("session idle timeout")(Right(()))
               stream.cancel()
             }
-          }
 
           for {
-            in <- incomingHub.newStream()
+            in             <- incomingHub.newStream()
             initialTimeout <- createTimeout(in)
-            _ = config.reporter.debug(s"Create idle timeout for $qsid")
-            schedulerVar = Var[F, Scheduler.JobHandler[F, Unit]](initialTimeout)
+            _               = config.reporter.debug(s"Create idle timeout for $qsid")
+            schedulerVar    = Var[F, Scheduler.JobHandler[F, Unit]](initialTimeout)
             _ <- in.foreach { _ =>
-              config.reporter.debug(s"Reset idle timeout for $qsid")
-              for {
-                currentTimer <- schedulerVar.get
-                _ <- currentTimer.cancel()
-                timeout <- createTimeout(in)
-                _ <- schedulerVar.set(timeout)
-              } yield ()
-            }
+                   config.reporter.debug(s"Reset idle timeout for $qsid")
+                   for {
+                     currentTimer <- schedulerVar.get
+                     _            <- currentTimer.cancel()
+                     timeout      <- createTimeout(in)
+                     _            <- schedulerVar.set(timeout)
+                   } yield ()
+                 }
           } yield ()
         }
 
@@ -116,56 +115,61 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
       } yield ()
     }
 
-    def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] = {
+    def handleStateChange(app: App, ehs: ExtensionsHandlers): F[Unit] =
       app.stateStream.flatMap { stream =>
         stream.foreach { case (id, state) =>
-          if (id != levsha.Id.TopLevel) Effect[F].unit else ehs
-            .map(_.onState(state.asInstanceOf[S]))
-            .sequence
-            .unit
+          if (id != levsha.Id.TopLevel) Effect[F].unit
+          else
+            ehs
+              .map(_.onState(state.asInstanceOf[S]))
+              .sequence
+              .unit
         }
       }
-    }
 
     def handleMessages(app: App, ehs: ExtensionsHandlers): F[Unit] =
-        app.messagesStream.foreach { m =>
-          ehs.map(_.onMessage(m)).sequence.unit
-        }
+      app.messagesStream.foreach { m =>
+        ehs.map(_.onMessage(m)).sequence.unit
+      }
 
     def create(): F[ApplicationInstance[F, S, M]] = {
       config.reporter.debug(s"Create session $qsid")
       for {
-        stateManager <- stateStorage.get(qsid.deviceId, qsid.sessionId)
+        stateManager      <- stateStorage.get(qsid.deviceId, qsid.sessionId)
         maybeInitialState <- stateManager.read[S](levsha.Id.TopLevel)
         // Top level state should exists. See 'initAppState'.
-        initialState <- maybeInitialState.fold(Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted")))(Effect[F].pure(_))
-        in <- incomingHub.newStream()
+        initialState <-
+          maybeInitialState.fold(
+            Effect[F].fail[S](BadRequestException(s"Top level state should exists. Snapshot for $qsid is corrupted"))
+          )(Effect[F].pure(_))
+        in      <- incomingHub.newStream()
         frontend = new Frontend[F](in, config.heartbeatLimit)
         app = new ApplicationInstance[F, S, M](
-          qsid,
-          frontend,
-          stateManager,
-          initialState,
-          config.document,
-          config.rootPath,
-          config.router,
-          createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
-          scheduler,
-          config.reporter,
-          config.recovery,
-          config.delayedRender
-        )
+                qsid,
+                frontend,
+                stateManager,
+                initialState,
+                config.document,
+                config.rootPath,
+                config.router,
+                createMiscProxy = (rc, k) => pageService.setupStatefulProxy(rc, qsid, k),
+                scheduler,
+                config.reporter,
+                config.recovery,
+                config.delayedRender
+              )
         browserAccess = app.topLevelComponentInstance.browserAccess
-        _ <- config.extensions.map(_.setup(browserAccess))
-          .sequence
-          .flatMap { ehs =>
-            for {
-              _ <- Effect[F].start(handleStateChange(app, ehs))
-              _ <- Effect[F].start(handleMessages(app, ehs))
-              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
-            } yield ()
-          }
-          .start
+        _ <- config.extensions
+               .map(_.setup(browserAccess))
+               .sequence
+               .flatMap { ehs =>
+                 for {
+                   _ <- Effect[F].start(handleStateChange(app, ehs))
+                   _ <- Effect[F].start(handleMessages(app, ehs))
+                   _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
+                 } yield ()
+               }
+               .start
         _ <- app.initialize()
       } yield {
         app

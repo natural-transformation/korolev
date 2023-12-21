@@ -1,7 +1,7 @@
-import _root_.fs2.{Stream => Fs2Stream}
 import _root_.cats.effect.{IO, _}
+import _root_.fs2.{Stream => Fs2Stream}
 import korolev.cats._
-import korolev.effect.{Queue, Effect => KorolevEffect, Stream => KorolevStream}
+import korolev.effect.{Effect => KorolevEffect, Queue, Stream => KorolevStream}
 import korolev.fs2._
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
@@ -16,10 +16,7 @@ class Fs2InteropSpec extends AsyncFlatSpec with Matchers {
     KorolevStream(values: _*)
       .mat[IO]()
       .flatMap { korolevStream =>
-        korolevStream
-          .toFs2
-          .compile
-          .toList
+        korolevStream.toFs2.compile.toList
       }
       .unsafeToFuture()
       .map { result =>
@@ -31,20 +28,15 @@ class Fs2InteropSpec extends AsyncFlatSpec with Matchers {
     val queue = Queue[IO, Int]()
     val io =
       for {
-        fiber <- KorolevEffect[IO]
-          .start {
-            queue
-              .stream
-              .toFs2
-              .compile
-              .toList
-          }
-        _ <- queue.offer(1)
-        _ <- queue.offer(2)
-        _ <- queue.offer(3)
-        _ <- queue.offer(4)
-        _ <- queue.offer(5)
-        _ <- queue.stop()
+        fiber <- KorolevEffect[IO].start {
+                   queue.stream.toFs2.compile.toList
+                 }
+        _      <- queue.offer(1)
+        _      <- queue.offer(2)
+        _      <- queue.offer(3)
+        _      <- queue.offer(4)
+        _      <- queue.offer(5)
+        _      <- queue.stop()
         result <- fiber.join()
       } yield {
         result shouldEqual List(1, 2, 3, 4, 5)

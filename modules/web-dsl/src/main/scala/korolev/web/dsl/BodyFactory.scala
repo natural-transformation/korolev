@@ -1,10 +1,10 @@
 package korolev.web.dsl
 
 import korolev.data.BytesLike
-import korolev.web.Headers
-import korolev.effect.{Effect, Stream}
 import korolev.data.syntax._
+import korolev.effect.{Effect, Stream}
 import korolev.effect.syntax._
+import korolev.web.Headers
 
 trait BodyFactory[F[_], A, B] {
   def mkBody(source: A): F[BodyFactory.Body[B]]
@@ -41,7 +41,7 @@ object BodyFactory {
   private final class StreamedBodyFactory[F[_]: Effect, A, B](implicit bf: BodyFactory[F, A, B])
       extends BodyFactory[F, A, Stream[F, B]] {
 
-    def mkBody(source: A): F[Body[Stream[F, B]]] = {
+    def mkBody(source: A): F[Body[Stream[F, B]]] =
       bf.mkBody(source).flatMap { body =>
         Stream(body.content).mat().map { stream =>
           Body(
@@ -51,20 +51,24 @@ object BodyFactory {
           )
         }
       }
-    }
   }
 
   implicit def stringBytesLikeBodyFactory[F[_]: Effect, B: BytesLike]: BodyFactory[F, String, B] =
     new StringBytesLikeBodyFactory[F, B]()
 
-  implicit def jsonBodyFactory[F[_]: Effect, J: JsonCodec, B](implicit bf: BodyFactory[F, String, B]): BodyFactory[F, J, B] =
+  implicit def jsonBodyFactory[F[_]: Effect, J: JsonCodec, B](implicit
+    bf: BodyFactory[F, String, B]
+  ): BodyFactory[F, J, B] =
     new JsonBodyFactory[F, J, B]()
 
-  implicit def streamedBodyFactory[F[_]: Effect, A, B](implicit bf: BodyFactory[F, A, B]): BodyFactory[F, A, Stream[F, B]] =
+  implicit def streamedBodyFactory[F[_]: Effect, A, B](implicit
+    bf: BodyFactory[F, A, B]
+  ): BodyFactory[F, A, Stream[F, B]] =
     new StreamedBodyFactory[F, A, B]()
 
-  implicit def streamedEmptyBodyFactory[F[_]: Effect, A]: EmptyBodyFactory[Stream[F, A]] = new EmptyBodyFactory[Stream[F, A]] {
-    val emptyBody: Body[Stream[F, A]] =
-      Body(Stream.empty, Map.empty, None)
-  }
+  implicit def streamedEmptyBodyFactory[F[_]: Effect, A]: EmptyBodyFactory[Stream[F, A]] =
+    new EmptyBodyFactory[Stream[F, A]] {
+      val emptyBody: Body[Stream[F, A]] =
+        Body(Stream.empty, Map.empty, None)
+    }
 }

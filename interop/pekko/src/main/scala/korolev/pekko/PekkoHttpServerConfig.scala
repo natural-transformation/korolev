@@ -18,14 +18,16 @@ package korolev.pekko
 
 import scala.concurrent.duration._
 
-case class PekkoHttpServerConfig(maxRequestBodySize: Int = PekkoHttpServerConfig.DefaultMaxRequestBodySize,
-                                 outputBufferSize: Int = PekkoHttpServerConfig.DefaultOutputBufferSize,
-                                 wsStreamedCompletionTimeout: FiniteDuration = PekkoHttpServerConfig.DefaultWsStreamedCompletionTimeout,
-                                 wsStreamedParallelism: Int = PekkoHttpServerConfig.DefaultWsStreamedParallelism)
+case class PekkoHttpServerConfig(
+  maxRequestBodySize: Int = PekkoHttpServerConfig.DefaultMaxRequestBodySize,
+  outputBufferSize: Int = PekkoHttpServerConfig.DefaultOutputBufferSize,
+  wsStreamedCompletionTimeout: FiniteDuration = PekkoHttpServerConfig.DefaultWsStreamedCompletionTimeout,
+  wsStreamedParallelism: Int = PekkoHttpServerConfig.DefaultWsStreamedParallelism
+)
 
 object PekkoHttpServerConfig {
-  val DefaultMaxRequestBodySize: Int = 8 * 1024 * 1024
-  val DefaultOutputBufferSize: Int = 1000
+  val DefaultMaxRequestBodySize: Int                     = 8 * 1024 * 1024
+  val DefaultOutputBufferSize: Int                       = 1000
   val DefaultWsStreamedCompletionTimeout: FiniteDuration = 30.seconds
-  val DefaultWsStreamedParallelism: Int = 2
+  val DefaultWsStreamedParallelism: Int                  = 2
 }

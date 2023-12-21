@@ -1,25 +1,26 @@
 package korolev.testkit
 
+import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
+import java.util.NoSuchElementException
+import korolev.{Context, Qsid, Transition, TransitionAsync}
 import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId, MappedAccess}
 import korolev.data.Bytes
 import korolev.effect.Effect
+import korolev.effect.Stream
 import korolev.effect.syntax.*
 import korolev.internal.Frontend.ClientSideException
 import korolev.util.{JsCode, Lens}
 import korolev.web.FormData
-import korolev.{Context, Qsid, Transition, TransitionAsync}
 import org.graalvm.polyglot.HostAccess
-
-import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
-import java.util.NoSuchElementException
 import scala.collection.mutable
-import korolev.effect.Stream
 
-case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
-                   forms: Map[ElementId, FormData] = Map.empty,
-                   filesMap: Map[ElementId, Map[String, Array[Byte]]] = Map.empty,
-                   jsMocks: List[String] = Nil) {
+case class Browser(
+  properties: Map[(ElementId, String), String] = Map.empty,
+  forms: Map[ElementId, FormData] = Map.empty,
+  filesMap: Map[ElementId, Map[String, Array[Byte]]] = Map.empty,
+  jsMocks: List[String] = Nil
+) {
 
   def property(id: ElementId, name: String, value: String): Browser =
     copy(properties = properties + ((id -> name, value)))
@@ -34,10 +35,9 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
     copy(jsMocks = script :: jsMocks)
 
   def form(id: ElementId, fields: (String, String)*): Browser = {
-    val entries = fields map {
-      case (k, v) =>
-        val data = ByteBuffer.wrap(v.getBytes(StandardCharsets.UTF_8))
-        FormData.Entry(k, data, Nil)
+    val entries = fields map { case (k, v) =>
+      val data = ByteBuffer.wrap(v.getBytes(StandardCharsets.UTF_8))
+      FormData.Entry(k, data, Nil)
     }
     copy(forms = forms + ((id, FormData(entries))))
   }
@@ -47,7 +47,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
    */
   def file(id: ElementId, file: (String, Array[Byte])): Browser =
     filesMap.get(id) match {
-      case None => copy(filesMap = filesMap + (id -> Map(file)))
+      case None             => copy(filesMap = filesMap + (id -> Map(file)))
       case Some(knownFiles) => copy(filesMap = filesMap + (id -> (knownFiles + file)))
     }
 
@@ -55,38 +55,31 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
    * Set files at `id` to `filesList`.
    */
   def files(id: ElementId, filesList: (String, Array[Byte])*): Browser =
-    copy(filesMap = filesMap + (id -> Map(filesList:_*)))
+    copy(filesMap = filesMap + (id -> Map(filesList: _*)))
 
   /**
    * Simulate event propagation on the given DOM.
    *
-   * @example {{{
+   * @example
+   *   {{{
    *
    * def onClick(access: Access) = ???
    *
-   * val dom = body(
-   *   div("Hello world"),
-   *   button(
-   *     event("click")(onClick),
-   *     name := "my-button",
-   *     "Click me"
-   *   )
-   * )
+   * val dom = body( div("Hello world"), button( event("click")(onClick), name
+   * := "my-button", "Click me" ) )
    *
-   * val actions = Browser.event(
-   *   state = myInitialState,
-   *   dom = dom,
-   *   event = "click"
-   *   target = _.byName("by-button").headOption,
-   *  )
-   * }}}
-   * @see [[access]]
+   * val actions = Browser.event( state = myInitialState, dom = dom, event =
+   * "click" target = _.byName("by-button").headOption, ) }}}
+   * @see
+   *   [[access]]
    */
-  def event[F[_]: Effect, S, M](state: S,
-                                dom: levsha.Document.Node[Binding[F, S, M]],
-                                event: String,
-                                target: PseudoHtml => Option[levsha.Id],
-                                eventData: String = ""): F[Seq[Action[F, S, M]]] = {
+  def event[F[_]: Effect, S, M](
+    state: S,
+    dom: levsha.Document.Node[Binding[F, S, M]],
+    event: String,
+    target: PseudoHtml => Option[levsha.Id],
+    eventData: String = ""
+  ): F[Seq[Action[F, S, M]]] = {
 
     val rr = PseudoHtml.render(dom)
     target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { target =>
@@ -112,16 +105,19 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
   /**
    * Applies `f` to the Browser using [[Context.Access]].
-   * @param elements evalJs uses this mapping to search elements on the client side.
+   * @param elements
+   *   evalJs uses this mapping to search elements on the client side.
    */
-  def access[F[_]: Effect, S, M](initialState: S,
-                                 f: Access[F, S, M] => F[Unit],
-                                 eventData: String = "",
-                                 elements: Map[levsha.Id, ElementId] = Map.empty): F[Seq[Action[F, S, M]]] = {
+  def access[F[_]: Effect, S, M](
+    initialState: S,
+    f: Access[F, S, M] => F[Unit],
+    eventData: String = "",
+    elements: Map[levsha.Id, ElementId] = Map.empty
+  ): F[Seq[Action[F, S, M]]] = {
 
-    val ed = eventData
-    val actions = mutable.Buffer.empty[Action[F, S, M]]
-    var browser = this
+    val ed           = eventData
+    val actions      = mutable.Buffer.empty[Action[F, S, M]]
+    var browser      = this
     var currentState = initialState
     val stub = new BaseAccessDefault[F, S, M] {
 
@@ -144,19 +140,17 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
       def state: F[S] = Effect[F].delay(currentState)
 
-      def transition(f: Transition[S]): F[Unit] = {
+      def transition(f: Transition[S]): F[Unit] =
         Effect[F].delay {
           currentState = f(currentState)
           actions += Action.Transition(currentState)
         }
-      }
 
-      def transitionAsync(f: TransitionAsync[F, S]): F[Unit] = {
+      def transitionAsync(f: TransitionAsync[F, S]): F[Unit] =
         f(currentState).map { newState =>
           currentState = newState
           actions += Action.Transition(newState)
         }
-      }
 
       def transitionForce(f: Transition[S]): F[Unit] =
         transition(f)
@@ -175,29 +169,27 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
       def downloadFiles(id: ElementId): F[List[(Context.FileHandler, Bytes)]] =
         Effect[F].delay {
-          browser.filesMap(id).toList map {
-            case (name, bytes) => Context.FileHandler(name, bytes.length)(id) -> Bytes.wrap(bytes)
+          browser.filesMap(id).toList map { case (name, bytes) =>
+            Context.FileHandler(name, bytes.length)(id) -> Bytes.wrap(bytes)
           }
         }
 
       def downloadFilesAsStream(id: ElementId): F[List[(Context.FileHandler, Stream[F, Bytes])]] =
         Effect[F].sequence {
-          browser.filesMap(id).toList map {
-            case (name, ba) =>
-              val bytes = Bytes.wrap(ba)
-              val h = Context.FileHandler(name, ba.length)(id)
-              Stream(bytes).mat().map { s =>
-                (h, s)
-              }
+          browser.filesMap(id).toList map { case (name, ba) =>
+            val bytes = Bytes.wrap(ba)
+            val h     = Context.FileHandler(name, ba.length)(id)
+            Stream(bytes).mat().map { s =>
+              (h, s)
+            }
           }
         }
 
-      def downloadFileAsStream(handler: Context.FileHandler): F[Stream[F, Bytes]] = {
+      def downloadFileAsStream(handler: Context.FileHandler): F[Stream[F, Bytes]] =
         Effect[F].delayAsync {
           val bytesOpt = browser.filesMap.collectFirst {
-            Function.unlift {
-              case (_, files) =>
-                files.get(handler.fileName)
+            Function.unlift { case (_, files) =>
+              files.get(handler.fileName)
             }
           }
           bytesOpt match {
@@ -207,12 +199,11 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
               Stream(bytes).mat()
           }
         }
-      }
 
       def listFiles(id: ElementId): F[List[Context.FileHandler]] =
         Effect[F].delay {
-          browser.filesMap(id).toList map {
-            case (name, bytes) => Context.FileHandler(name, bytes.length)(id)
+          browser.filesMap(id).toList map { case (name, bytes) =>
+            Context.FileHandler(name, bytes.length)(id)
           }
         }
 
@@ -227,15 +218,16 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
           // TODO prevent reparsing
           // TODO handle system errors
 
-          val context = GraalContext.create()
+          val context   = GraalContext.create()
           val finalCode = code.mkString(elements.map(_.swap))
-          val bindings = context.getBindings("js")
-          val handler = new Browser.Handler(actions, cb)
+          val bindings  = context.getBindings("js")
+          val handler   = new Browser.Handler(actions, cb)
 
           bindings.putMember("code", finalCode)
           bindings.putMember("handler", handler)
 
-          context.eval("js",
+          context.eval(
+            "js",
             jsMocks.mkString("\n") + """
               var result;
               var status = 0;
@@ -283,8 +275,7 @@ case class Browser(properties: Map[(ElementId, String), String] = Map.empty,
 
 object Browser {
 
-  class Handler[F[_], S, M](actions: mutable.Buffer[Action[F, S, M]],
-                            cb: Either[Throwable, String] => Unit) {
+  class Handler[F[_], S, M](actions: mutable.Buffer[Action[F, S, M]], cb: Either[Throwable, String] => Unit) {
     @HostAccess.Export
     def result(value: String): Unit = {
       val result = Right(value)

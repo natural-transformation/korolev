@@ -17,37 +17,38 @@
 package korolev.internal
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicLong}
-import scala.collection.mutable
-import scala.annotation.switch
 import korolev.Context.FileHandler
-import korolev.data.Bytes
-import korolev.web.{FormData, PathAndQuery}
-import korolev.effect.syntax.*
 import korolev.Metrics
+import korolev.data.Bytes
 import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
+import korolev.effect.syntax.*
+import korolev.web.{FormData, PathAndQuery}
 import levsha.Id
 import levsha.events.EventId
 import levsha.impl.DiffRenderContext.ChangesPerformer
-
+import scala.annotation.switch
+import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
 /**
-  * Typed interface to client side
-  */
-final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbeatLimit: Option[Int])(implicit reporter: Reporter,
-                                                                        ec: ExecutionContext) {
+ * Typed interface to client side
+ */
+final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbeatLimit: Option[Int])(implicit
+  reporter: Reporter,
+  ec: ExecutionContext
+) {
 
   import Frontend._
 
-  private val lastDescriptor = new AtomicInteger(0)
-  private val avgDiffTime = new AtomicLong(0)
+  private val lastDescriptor            = new AtomicInteger(0)
+  private val avgDiffTime               = new AtomicLong(0)
   private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
 
-  private val customCallbacks = mutable.Map.empty[String, String => F[Unit]]
-  private val downloadFiles = mutable.Map.empty[String, DownloadFileMeta[F]]
-  private val stringPromises = AsyncTable.unsafeCreateEmpty[F, String, String]
+  private val customCallbacks  = mutable.Map.empty[String, String => F[Unit]]
+  private val downloadFiles    = mutable.Map.empty[String, DownloadFileMeta[F]]
+  private val stringPromises   = AsyncTable.unsafeCreateEmpty[F, String, String]
   private val formDataPromises = AsyncTable.unsafeCreateEmpty[F, String, FormData]
-  private val filesPromises = AsyncTable.unsafeCreateEmpty[F, String, Stream[F, Bytes]]
+  private val filesPromises    = AsyncTable.unsafeCreateEmpty[F, String, Stream[F, Bytes]]
 
   // Store file name and it`s length as data
   private val fileNamePromises = AsyncTable.unsafeCreateEmpty[F, String, List[(String, Long)]]
@@ -65,15 +66,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   val outgoingMessages: Stream[F, String] = outgoingQueue.stream
 
   val domEventMessages: Stream[F, Frontend.DomEventMessage] =
-    rawDomEvents.map {
-      case (_, args) =>
-        val Array(eventCounter, target, tpe) = args.split(':')
-        DomEventMessage(eventCounter.toInt, Id(target), tpe)
+    rawDomEvents.map { case (_, args) =>
+      val Array(eventCounter, target, tpe) = args.split(':')
+      DomEventMessage(eventCounter.toInt, Id(target), tpe)
     }
 
   val browserHistoryMessages: Stream[F, PathAndQuery] =
-    rawBrowserHistoryChanges.map {
-      case (_, args) => PathAndQuery.fromString(args)
+    rawBrowserHistoryChanges.map { case (_, args) =>
+      PathAndQuery.fromString(args)
     }
 
   private def sendRaw(str: String) =
@@ -104,27 +104,27 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def uploadForm(id: Id): F[FormData] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadForm.code, id.mkString, descriptor)
-      result <- formDataPromises.get(descriptor)
+      _          <- send(Procedure.UploadForm.code, id.mkString, descriptor)
+      result     <- formDataPromises.get(descriptor)
     } yield result
 
   def listFiles(id: Id): F[List[(String, Long)]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ListFiles.code, id.mkString, descriptor)
-      files <- fileNamePromises.get(descriptor)
+      _          <- send(Procedure.ListFiles.code, id.mkString, descriptor)
+      files      <- fileNamePromises.get(descriptor)
     } yield files
 
   def uploadFile(id: Id, handler: FileHandler): F[Stream[F, Bytes]] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
-      file <- filesPromises.get(descriptor)
+      _          <- send(Procedure.UploadFile.code, id.mkString, descriptor, handler.fileName)
+      file       <- filesPromises.get(descriptor)
     } yield file
 
   def downloadFile(name: String, stream: Stream[F, Bytes], size: Option[Long], mimeType: String): F[Unit] = {
     val (consumed, updatedStream) = stream.handleConsumed
-    val id = lastDescriptor.getAndIncrement().toString
+    val id                        = lastDescriptor.getAndIncrement().toString
     consumed.runAsync(_ => downloadFiles.remove(name))
     downloadFiles.put(id, DownloadFileMeta(updatedStream, size, mimeType))
     send(Procedure.DownloadFile.code, id, name)
@@ -139,23 +139,21 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   private def nextDescriptor() =
     Effect[F].delay(lastDescriptor.getAndIncrement().toString)
 
-  def extractProperty(id: Id, name: String): F[String] = {
+  def extractProperty(id: Id, name: String): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-      result <- stringPromises.get(descriptor)
+      _          <- send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
+      result     <- stringPromises.get(descriptor)
     } yield result
-  }
 
-  def setProperty(id: Id, name: String, value: Any): F[Unit] = {
+  def setProperty(id: Id, name: String, value: Any): F[Unit] =
     send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
-  }
 
   def evalJs(code: String): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.EvalJs.code, descriptor, code)
-      result <- stringPromises.get(descriptor)
+      _          <- send(Procedure.EvalJs.code, descriptor, code)
+      result     <- stringPromises.get(descriptor)
     } yield result
 
   def resetForm(id: Id): F[Unit] =
@@ -179,22 +177,22 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def extractEventData(dem: DomEventMessage): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _ <- send(Procedure.ExtractEventData.code, descriptor, dem.target.mkString, dem.eventType)
-      result <- stringPromises.get(descriptor)
+      _          <- send(Procedure.ExtractEventData.code, descriptor, dem.target.mkString, dem.eventType)
+      result     <- stringPromises.get(descriptor)
     } yield result
 
   def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
     def diff = {
       val timeStart = System.nanoTime()
-      val sb = remoteDomChangesPerformer.buffer
+      val sb        = remoteDomChangesPerformer.buffer
       sb.append('[')
       sb.append(Procedure.ModifyDom.codeString)
       sb.append(',')
       f(remoteDomChangesPerformer)
       sb.update(sb.length - 1, ' ') // replace last comma to space
       sb.append(']')
-      val result = remoteDomChangesPerformer.buffer.result()
-      val timeEnd = System.nanoTime()
+      val result    = remoteDomChangesPerformer.buffer.result()
+      val timeEnd   = System.nanoTime()
       val timeTotal = timeEnd - timeStart
       Metrics.MaxDiffNanos.update(prev => Math.max(prev, timeTotal))
       Metrics.MinDiffNanos.update(prev => if (prev == 0) timeTotal else Math.min(prev, timeTotal))
@@ -204,8 +202,8 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
     for {
       // Switch to blocking context if rendering is slow
       result <- if (avgDiffTime.get() > HeavyRenderThresholdNanos) Effect[F].blocking(diff) else Effect[F].delay(diff)
-      _ <- sendRaw(result)
-      _ <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
+      _      <- sendRaw(result)
+      _      <- Effect[F].delay(remoteDomChangesPerformer.buffer.clear())
     } yield ()
   }
 
@@ -231,11 +229,11 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
     }
 
   private def unescapeJsonString(s: String): String = {
-    val sb = new mutable.StringBuilder()
-    var i = 1
+    val sb  = new mutable.StringBuilder()
+    var i   = 1
     val len = s.length - 1
     while (i < len) {
-      val c = s.charAt(i)
+      val c             = s.charAt(i)
       var charsConsumed = 0
       if (c != '\\') {
         charsConsumed = 1
@@ -264,7 +262,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   private def parseMessage(json: String) = {
     val tokens = json
       .substring(1, json.length - 1) // remove brackets
-      .split(",", 2) // split to tokens
+      .split(",", 2)                 // split to tokens
     val callbackType = tokens(0)
     val args =
       if (tokens.length > 1) unescapeJsonString(tokens(1))
@@ -329,23 +327,23 @@ object Frontend {
   }
 
   object Procedure {
-    case object SetEventCounter extends Procedure(0) // (id, eventType, n)
-    case object Reload extends Procedure(1) // ()
-    case object ListenEvent extends Procedure(2) // (type, preventDefault)
-    case object ExtractProperty extends Procedure(3) // (id, propertyName, descriptor)
-    case object ModifyDom extends Procedure(4) // (commands)
-    case object Focus extends Procedure(5) // (id) {
-    case object ChangePageUrl extends Procedure(6) // (path)
-    case object UploadForm extends Procedure(7) // (id, descriptor)
-    case object ReloadCss extends Procedure(8) // ()
-    case object KeepAlive extends Procedure(9) // ()
-    case object EvalJs extends Procedure(10) // (code)
-    case object ExtractEventData extends Procedure(11) // (descriptor, id, eventType)
-    case object ListFiles extends Procedure(12) // (id, descriptor)
-    case object UploadFile extends Procedure(13) // (id, descriptor, fileName)
-    case object RestForm extends Procedure(14) // (id)
-    case object DownloadFile extends Procedure(15) // (descriptor, fileName)
-    case object Heartbeat extends Procedure(16) // ()
+    case object SetEventCounter    extends Procedure(0)  // (id, eventType, n)
+    case object Reload             extends Procedure(1)  // ()
+    case object ListenEvent        extends Procedure(2)  // (type, preventDefault)
+    case object ExtractProperty    extends Procedure(3)  // (id, propertyName, descriptor)
+    case object ModifyDom          extends Procedure(4)  // (commands)
+    case object Focus              extends Procedure(5)  // (id) {
+    case object ChangePageUrl      extends Procedure(6)  // (path)
+    case object UploadForm         extends Procedure(7)  // (id, descriptor)
+    case object ReloadCss          extends Procedure(8)  // ()
+    case object KeepAlive          extends Procedure(9)  // ()
+    case object EvalJs             extends Procedure(10) // (code)
+    case object ExtractEventData   extends Procedure(11) // (descriptor, id, eventType)
+    case object ListFiles          extends Procedure(12) // (id, descriptor)
+    case object UploadFile         extends Procedure(13) // (id, descriptor, fileName)
+    case object RestForm           extends Procedure(14) // (id)
+    case object DownloadFile       extends Procedure(15) // (descriptor, fileName)
+    case object Heartbeat          extends Procedure(16) // ()
     case object ResetEventCounters extends Procedure(16) // ()
 
     val All = Set(
@@ -378,23 +376,23 @@ object Frontend {
   }
 
   object ModifyDomProcedure {
-    case object Create extends ModifyDomProcedure(0) // (id, childId, xmlNs, tag)
-    case object CreateText extends ModifyDomProcedure(1) // (id, childId, text)
-    case object Remove extends ModifyDomProcedure(2) // (id, childId)
-    case object SetAttr extends ModifyDomProcedure(3) // (id, xmlNs, name, value, isProperty)
-    case object RemoveAttr extends ModifyDomProcedure(4) // (id, xmlNs, name, isProperty)
-    case object SetStyle extends ModifyDomProcedure(5) // (id, name, value)
+    case object Create      extends ModifyDomProcedure(0) // (id, childId, xmlNs, tag)
+    case object CreateText  extends ModifyDomProcedure(1) // (id, childId, text)
+    case object Remove      extends ModifyDomProcedure(2) // (id, childId)
+    case object SetAttr     extends ModifyDomProcedure(3) // (id, xmlNs, name, value, isProperty)
+    case object RemoveAttr  extends ModifyDomProcedure(4) // (id, xmlNs, name, isProperty)
+    case object SetStyle    extends ModifyDomProcedure(5) // (id, name, value)
     case object RemoveStyle extends ModifyDomProcedure(6) // (id, name)
   }
 
   sealed abstract class PropertyType(final val code: Int)
 
   object PropertyType {
-    case object String extends PropertyType(0)
-    case object Number extends PropertyType(1)
+    case object String  extends PropertyType(0)
+    case object Number  extends PropertyType(1)
     case object Boolean extends PropertyType(2)
-    case object Object extends PropertyType(3)
-    case object Error extends PropertyType(4)
+    case object Object  extends PropertyType(3)
+    case object Error   extends PropertyType(4)
   }
 
   sealed abstract class EvalJsStatus(final val code: Int)
@@ -407,21 +405,23 @@ object Frontend {
   sealed abstract class CallbackType(final val code: Int)
 
   object CallbackType {
-    case object DomEvent extends CallbackType(0) // `$eventCounter:$elementId:$eventType`
-    case object CustomCallback extends CallbackType(1) // `$name:arg`
-    case object ExtractPropertyResponse extends CallbackType(2) // `$descriptor:$value`
-    case object History extends CallbackType(3) // URL
-    case object EvalJsResponse extends CallbackType(4) // `$descriptor:$status:$value`
+    case object DomEvent                 extends CallbackType(0) // `$eventCounter:$elementId:$eventType`
+    case object CustomCallback           extends CallbackType(1) // `$name:arg`
+    case object ExtractPropertyResponse  extends CallbackType(2) // `$descriptor:$value`
+    case object History                  extends CallbackType(3) // URL
+    case object EvalJsResponse           extends CallbackType(4) // `$descriptor:$status:$value`
     case object ExtractEventDataResponse extends CallbackType(5) // `$descriptor:$dataJson`
-    case object Heartbeat extends CallbackType(6) // `$descriptor:$anyvalue`
+    case object Heartbeat                extends CallbackType(6) // `$descriptor:$anyvalue`
 
-    final val All = Set(DomEvent,
-                        CustomCallback,
-                        ExtractPropertyResponse,
-                        History,
-                        EvalJsResponse,
-                        ExtractEventDataResponse,
-                        Heartbeat)
+    final val All = Set(
+      DomEvent,
+      CustomCallback,
+      ExtractPropertyResponse,
+      History,
+      EvalJsResponse,
+      ExtractEventDataResponse,
+      Heartbeat
+    )
 
     def apply(n: Int): Option[CallbackType] =
       All.find(_.code == n)
@@ -433,6 +433,6 @@ object Frontend {
 
   final case class DownloadFileMeta[F[_]: Effect](stream: Stream[F, Bytes], size: Option[Long], mimeType: String)
 
-  final val ReloadMessage: String = "[1]"
+  final val ReloadMessage: String     = "[1]"
   final val HeavyRenderThresholdNanos = 50000000L
 }

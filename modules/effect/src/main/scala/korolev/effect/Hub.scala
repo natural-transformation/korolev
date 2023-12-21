@@ -17,22 +17,19 @@
 package korolev.effect
 
 import java.util.concurrent.atomic.AtomicBoolean
-
 import korolev.effect.syntax._
-
 import scala.collection.concurrent.TrieMap
 
 /**
-  * A function which returns new streams which
-  * contains same elements as the parent stream.
-  * This is helpful when you want to consume
-  * content of the stream in few different places.
-  */
+ * A function which returns new streams which contains same elements as the
+ * parent stream. This is helpful when you want to consume content of the stream
+ * in few different places.
+ */
 final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
 
   @volatile private var closed = false
 
-  private val queues = TrieMap.empty[Queue[F, T], Unit]
+  private val queues     = TrieMap.empty[Queue[F, T], Unit]
   private val inProgress = new AtomicBoolean(false)
 
   private final class StreamOnePullAtTime(thisQueue: Queue[F, T]) extends Stream[F, T] {
@@ -66,12 +63,12 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
       for {
         began <- begin()
         result <- if (began)
-          for {
-            size <- thisQueue.size()
-            result <- if (size > 0) end() *> thisQueue.stream.pull()
-            else pullUpstream().flatMap(v => end().as(v))
-          } yield result
-        else thisQueue.stream.pull()
+                    for {
+                      size <- thisQueue.size()
+                      result <- if (size > 0) end() *> thisQueue.stream.pull()
+                                else pullUpstream().flatMap(v => end().as(v))
+                    } yield result
+                  else thisQueue.stream.pull()
       } yield result
 
     def cancel(): F[Unit] = thisQueue.close()
@@ -87,7 +84,7 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
   def newStreamUnsafe(): Stream[F, T] = {
     if (closed)
       throw new IllegalStateException("Hub is closed")
-    val queue = new QueueRemoveFromHubOnClose()
+    val queue  = new QueueRemoveFromHubOnClose()
     val stream = new StreamOnePullAtTime(queue)
     queues.put(queue, ())
     stream
@@ -101,8 +98,9 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
 object Hub {
 
   /**
-    * @see Hub
-    */
+   * @see
+   *   Hub
+   */
   def apply[F[_]: Effect, T](stream: Stream[F, T], bufferSize: Int = Int.MaxValue): Hub[F, T] =
     new Hub(stream, bufferSize)
 }

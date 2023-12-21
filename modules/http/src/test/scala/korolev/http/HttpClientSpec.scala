@@ -3,21 +3,20 @@ package korolev.http
 import akka.http.scaladsl.model.ws.{BinaryMessage, Message, TextMessage}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.{Flow, Source}
-import korolev.data.Bytes
-import korolev.data.syntax._
-import korolev.effect.Reporter.PrintReporter
-import korolev.effect.Reporter.PrintReporter.Implicit
-import korolev.effect.{Queue, Reporter, Stream}
-import korolev.http.protocol.WebSocketProtocol.Frame
-import korolev.web.PathAndQuery._
-import korolev.web.Request.Method
-import korolev.web.Response.Status
-import korolev.web.{Headers, PathAndQuery, Request}
-import org.scalatest.freespec.AsyncFreeSpec
-
 import java.io.ByteArrayInputStream
 import java.net.{BindException, InetSocketAddress, URI}
 import java.util.zip.GZIPInputStream
+import korolev.data.Bytes
+import korolev.data.syntax._
+import korolev.effect.{Queue, Reporter, Stream}
+import korolev.effect.Reporter.PrintReporter
+import korolev.effect.Reporter.PrintReporter.Implicit
+import korolev.http.protocol.WebSocketProtocol.Frame
+import korolev.web.{Headers, PathAndQuery, Request}
+import korolev.web.PathAndQuery._
+import korolev.web.Request.Method
+import korolev.web.Response.Status
+import org.scalatest.freespec.AsyncFreeSpec
 import scala.concurrent.Future
 
 class HttpClientSpec extends AsyncFreeSpec {
@@ -29,11 +28,11 @@ class HttpClientSpec extends AsyncFreeSpec {
       for {
         client <- HttpClient.create[Future, Array[Byte]]()
         response <- client.http(
-          new InetSocketAddress("localhost", port),
-          request = Request(Method.Get, Root / "hello", Nil, Some(0), Stream.empty[Future, Array[Byte]])
-        )
+                      new InetSocketAddress("localhost", port),
+                      request = Request(Method.Get, Root / "hello", Nil, Some(0), Stream.empty[Future, Array[Byte]])
+                    )
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
-        utf8Body = strictResponseBody.asUtf8String
+        utf8Body            = strictResponseBody.asUtf8String
       } yield {
         assert(utf8Body.contains("Hello world") && response.status == Status.Ok)
       }
@@ -41,12 +40,10 @@ class HttpClientSpec extends AsyncFreeSpec {
 
     "should properly send GET requests over TLS" in {
       for {
-        client <- HttpClient.create[Future, Array[Byte]]()
-        response <- client(
-          Method.Get, URI.create("https://fomkin.org/hello.txt"),
-          Seq.empty, None, Stream.empty)
+        client             <- HttpClient.create[Future, Array[Byte]]()
+        response           <- client(Method.Get, URI.create("https://fomkin.org/hello.txt"), Seq.empty, None, Stream.empty)
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
-        utf8Body = strictResponseBody.asUtf8String
+        utf8Body            = strictResponseBody.asUtf8String
       } yield {
         assert(utf8Body.contains("Hello world") && response.status == Status.Ok)
       }
@@ -56,17 +53,17 @@ class HttpClientSpec extends AsyncFreeSpec {
       for {
         client <- HttpClient.create[Future, Array[Byte]]()
         response <- client.http(
-          new InetSocketAddress("localhost", port),
-          request = Request(
-            Method.Get,
-            Root / "gz",
-            Vector(Headers.AcceptEncoding -> "gzip"),
-            Some(0),
-            Stream.empty[Future, Array[Byte]]
-          )
-        )
+                      new InetSocketAddress("localhost", port),
+                      request = Request(
+                        Method.Get,
+                        Root / "gz",
+                        Vector(Headers.AcceptEncoding -> "gzip"),
+                        Some(0),
+                        Stream.empty[Future, Array[Byte]]
+                      )
+                    )
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
-        utf8Body = uncompressByteArray(strictResponseBody).asUtf8String
+        utf8Body            = uncompressByteArray(strictResponseBody).asUtf8String
       } yield {
         assert(utf8Body.contains("Hello world") && response.status == Status.Ok)
       }
@@ -76,17 +73,17 @@ class HttpClientSpec extends AsyncFreeSpec {
       for {
         client <- HttpClient.create[Future, Array[Byte]]()
         response <- client.http(
-          address = new InetSocketAddress("localhost", port),
-          request = Request(
-            Method.Get,
-            Root / "chunked",
-            Vector.empty,
-            Some(0),
-            Stream.empty[Future, Array[Byte]]
-          )
-        )
+                      address = new InetSocketAddress("localhost", port),
+                      request = Request(
+                        Method.Get,
+                        Root / "chunked",
+                        Vector.empty,
+                        Some(0),
+                        Stream.empty[Future, Array[Byte]]
+                      )
+                    )
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
-        utf8Body = strictResponseBody.asUtf8String
+        utf8Body            = strictResponseBody.asUtf8String
       } yield {
         assert(utf8Body.contains("123") && response.status == Status.Ok)
       }
@@ -99,20 +96,20 @@ class HttpClientSpec extends AsyncFreeSpec {
 
       for {
         client <- HttpClient.create[Future, Bytes]()
-        queue <- Future.successful(Queue[Future, Frame[Bytes]]())
+        queue  <- Future.successful(Queue[Future, Frame[Bytes]]())
         response <- client.webSocket(
-          address = new InetSocketAddress("localhost", port),
-          path = (Root / "echo"): PathAndQuery,
-          outgoingFrames = queue.stream,
-          cookie = Map.empty,
-          headers = Map.empty
-        )
-        _ <- queue.offer(wsSample1)
+                      address = new InetSocketAddress("localhost", port),
+                      path = (Root / "echo"): PathAndQuery,
+                      outgoingFrames = queue.stream,
+                      cookie = Map.empty,
+                      headers = Map.empty
+                    )
+        _     <- queue.offer(wsSample1)
         echo1 <- response.body.pull()
-        _ <- queue.offer(wsSample2)
+        _     <- queue.offer(wsSample2)
         echo2 <- response.body.pull()
-        _ <- response.body.cancel()
-        _ <- queue.close()
+        _     <- response.body.cancel()
+        _     <- queue.close()
       } yield {
         assert(echo1.contains(wsSample1) && echo2.contains(wsSample2))
       }
@@ -154,7 +151,7 @@ object HttpClientSpec {
         val xs = Vector(
           HttpEntity.ChunkStreamPart("1"),
           HttpEntity.ChunkStreamPart("2"),
-          HttpEntity.ChunkStreamPart("3"),
+          HttpEntity.ChunkStreamPart("3")
         )
         complete(HttpEntity.Chunked(ContentTypes.`text/plain(UTF-8)`, Source(xs)))
       }
@@ -178,7 +175,7 @@ object HttpClientSpec {
     val stream = new GZIPInputStream(new ByteArrayInputStream(from.asArray), from.length)
     val buffer = new Array[Byte](50)
     var result = new Array[Byte](0)
-    var n = 0
+    var n      = 0
     while ({
       { n = stream.read(buffer) };
       n > 0
@@ -190,18 +187,20 @@ object HttpClientSpec {
 
   def withServer[T](route: Route)(f: Int => Future[T]): Future[T] = {
 
-    implicit val system = ActorSystem(Behaviors.empty, "http-client-test-system")
+    implicit val system           = ActorSystem(Behaviors.empty, "http-client-test-system")
     implicit val executionContext = system.executionContext
 
     def tryBind(retries: Int) = {
       def nextPort = util.Random.nextInt(64000) + 1000 // select port 1000..64000
       def aux(port: Int, retries: Int, portAttempts: List[Int]): Future[(Int, Http.ServerBinding)] = retries match {
-        case 0 => Future.failed(new Exception(s"Unable to bind HTTP server. Tried ports: [${portAttempts.mkString(", ")}]"))
-        case _ => Http()
-          .newServerAt("localhost", port)
-          .bind(route)
-          .map(binding => (port, binding))
-          .recoverWith { case _: BindException => aux(nextPort, retries - 1, port :: portAttempts) }
+        case 0 =>
+          Future.failed(new Exception(s"Unable to bind HTTP server. Tried ports: [${portAttempts.mkString(", ")}]"))
+        case _ =>
+          Http()
+            .newServerAt("localhost", port)
+            .bind(route)
+            .map(binding => (port, binding))
+            .recoverWith { case _: BindException => aux(nextPort, retries - 1, port :: portAttempts) }
       }
       aux(nextPort, retries, Nil)
     }
@@ -209,8 +208,8 @@ object HttpClientSpec {
     tryBind(5).flatMap { case (port, binding) =>
       f(port).transformWith { tryResult =>
         for {
-          _ <- binding.unbind()
-          _ = system.terminate()
+          _      <- binding.unbind()
+          _       = system.terminate()
           result <- Future.fromTry(tryResult)
         } yield result
       }

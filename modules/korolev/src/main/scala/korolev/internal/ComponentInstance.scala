@@ -16,6 +16,7 @@
 
 package korolev.internal
 
+import Context.*
 import korolev.*
 import korolev.data.Bytes
 import korolev.effect.Effect
@@ -35,7 +36,6 @@ import levsha.Id
 import levsha.StatefulRenderContext
 import levsha.events.EventId
 import levsha.events.EventPhase
-
 import scala.collection.AbstractMapView
 import scala.collection.MapView
 import scala.collection.concurrent.TrieMap
@@ -43,42 +43,41 @@ import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
 
-import Context.*
-
 /**
-  * Component state holder and effects performer
-  *
-  * Performing cycle:
-  *
-  * 1. prepare()
-  * 2. Optionally setState()
-  * 3. applyRenderContext()
-  * 4. dropObsoleteMisc()
-  *
-  * @tparam AS Type of top level state (application state)
-  * @tparam CS Type of component state
-  */
+ * Component state holder and effects performer
+ *
+ * Performing cycle:
+ *
+ *   1. prepare() 2. Optionally setState() 3. applyRenderContext() 4.
+ *      dropObsoleteMisc()
+ *
+ * @tparam AS
+ *   Type of top level state (application state)
+ * @tparam CS
+ *   Type of component state
+ */
 final class ComponentInstance[
-    F[_]: Effect,
-    AS: StateSerializer: StateDeserializer,
-    M,
-    CS: StateSerializer: StateDeserializer,
-    P,
-    E
+  F[_]: Effect,
+  AS: StateSerializer: StateDeserializer,
+  M,
+  CS: StateSerializer: StateDeserializer,
+  P,
+  E
 ](
-    nodeId: Id,
-    sessionId: Qsid,
-    frontend: Frontend[F],
-    eventRegistry: EventRegistry[F],
-    stateManager: StateManager[F],
-    val component: Component[F, CS, P, E],
-    stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
-    createMiscProxy: (StatefulRenderContext[Binding[F, AS, M]],
-                      (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit) => StatefulRenderContext[
-      Binding[F, CS, E]],
-    scheduler: Scheduler[F],
-    reporter: Reporter,
-    recovery: PartialFunction[Throwable, F[Unit]],
+  nodeId: Id,
+  sessionId: Qsid,
+  frontend: Frontend[F],
+  eventRegistry: EventRegistry[F],
+  stateManager: StateManager[F],
+  val component: Component[F, CS, P, E],
+  stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
+  createMiscProxy: (
+    StatefulRenderContext[Binding[F, AS, M]],
+    (StatefulRenderContext[Binding[F, CS, E]], Binding[F, CS, E]) => Unit
+  ) => StatefulRenderContext[Binding[F, CS, E]],
+  scheduler: Scheduler[F],
+  reporter: Reporter,
+  recovery: PartialFunction[Throwable, F[Unit]]
 ) { self =>
 
   import ComponentInstance._
@@ -86,13 +85,13 @@ final class ComponentInstance[
 
   private val miscLock = new Object()
 
-  private var lastParameters: P = _
-  private val markedDelays = mutable.Set.empty[Id] // Set of the delays which are should survive
+  private var lastParameters: P        = _
+  private val markedDelays             = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
-  private val delays = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
-  private val elements = mutable.Map.empty[ElementId, Id]
-  private val events = mutable.Map.empty[EventId, Vector[Event[F, CS, E]]]
-  private val nestedComponents = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
+  private val delays                   = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
+  private val elements                 = mutable.Map.empty[ElementId, Id]
+  private val events                   = mutable.Map.empty[EventId, Vector[Event[F, CS, E]]]
+  private val nestedComponents         = mutable.Map.empty[Id, ComponentInstance[F, CS, E, _, _, _]]
 
   // Why we use '() => F[Unit]'? Because should
   // support scala.concurrent.Future which is has
@@ -107,7 +106,7 @@ final class ComponentInstance[
       unsafeGetId(elementId)
     }
 
-    private def unsafeGetId(elementId: ElementId): Id = {
+    private def unsafeGetId(elementId: ElementId): Id =
       // miscLock synchronization required
       // because prop handler methods can be
       // invoked during render.
@@ -121,7 +120,6 @@ final class ComponentInstance[
           case Some(id) => id
         }
       }
-    }
 
     def property(elementId: ElementId): PropertyHandler[F] = {
       val idF = getId(elementId)
@@ -153,31 +151,29 @@ final class ComponentInstance[
 
     def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = applyTransition(x => Effect[F].pure(f(x)))
-    def transitionForce(f: Transition[CS]): F[Unit] = applyTransitionForce(x => Effect[F].pure(f(x)))
-    def transitionAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransition(f)
+    def transition(f: Transition[CS]): F[Unit]                   = applyTransition(x => Effect[F].pure(f(x)))
+    def transitionForce(f: Transition[CS]): F[Unit]              = applyTransitionForce(x => Effect[F].pure(f(x)))
+    def transitionAsync(f: TransitionAsync[F, CS]): F[Unit]      = applyTransition(f)
     def transitionForceAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransitionForce(f)
 
     def downloadFormData(element: ElementId): F[FormData] =
       for {
-        id <- getId(element)
+        id       <- getId(element)
         formData <- frontend.uploadForm(id)
       } yield formData
 
-    def downloadFiles(id: ElementId): F[List[(FileHandler, Bytes)]] = {
+    def downloadFiles(id: ElementId): F[List[(FileHandler, Bytes)]] =
       downloadFilesAsStream(id).flatMap { streams =>
         Effect[F].sequence {
-          streams.map {
-            case (handler, data) =>
-              data
-                .fold(Bytes.empty)(_ ++ _)
-                .map(b => (handler, b))
+          streams.map { case (handler, data) =>
+            data
+              .fold(Bytes.empty)(_ ++ _)
+              .map(b => (handler, b))
           }
         }
       }
-    }
 
-    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]] = {
+    def downloadFilesAsStream(id: ElementId): F[List[(FileHandler, Stream[F, Bytes])]] =
       listFiles(id).flatMap { handlers =>
         Effect[F].sequence {
           handlers.map { handler =>
@@ -185,26 +181,23 @@ final class ComponentInstance[
           }
         }
       }
-    }
 
     /**
-      * Get selected file as a stream from input
-      */
-    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] = {
+     * Get selected file as a stream from input
+     */
+    def downloadFileAsStream(handler: FileHandler): F[Stream[F, Bytes]] =
       for {
-        id <- getId(handler.elementId)
+        id      <- getId(handler.elementId)
         streams <- frontend.uploadFile(id, handler)
       } yield streams
-    }
 
     def listFiles(elementId: ElementId): F[List[FileHandler]] =
       for {
-        id <- getId(elementId)
+        id    <- getId(elementId)
         files <- frontend.listFiles(id)
       } yield {
-        files.map {
-          case (fileName, size) =>
-            FileHandler(fileName, size)(elementId)
+        files.map { case (fileName, size) =>
+          FileHandler(fileName, size)(elementId)
         }
       }
 
@@ -228,17 +221,17 @@ final class ComponentInstance[
   private[korolev] val browserAccess = BrowserAccess(DomEventMessage(0, Id.TopLevel, "init"))
 
   /**
-    * Subscribes to component instance events.
-    * Callback will be invoked on call of `access.publish()` in the
-    * component instance context.
-    */
-  def setEventsSubscription(callback: E => _): Unit = {
+   * Subscribes to component instance events. Callback will be invoked on call
+   * of `access.publish()` in the component instance context.
+   */
+  def setEventsSubscription(callback: E => _): Unit =
     eventSubscription = Some(callback)
-  }
 
-  def applyRenderContext(parameters: P,
-                         rc: StatefulRenderContext[Binding[F, AS, M]],
-                         snapshot: StateManager.Snapshot): Unit = miscLock.synchronized {
+  def applyRenderContext(
+    parameters: P,
+    rc: StatefulRenderContext[Binding[F, AS, M]],
+    snapshot: StateManager.Snapshot
+  ): Unit = miscLock.synchronized {
     // Reset all event handlers delays and elements
     prepare()
     val state = snapshot[CS](nodeId).map(Right(_)).getOrElse(component.initialState)
@@ -259,18 +252,19 @@ final class ComponentInstance[
         generateState(parameters).flatMap { newState =>
           stateManager.write(nodeId, newState) *>
             stateQueue.enqueue(nodeId, newState, None)
-        }.runAsyncForget  // TODO Should be cancelable
+        }.runAsyncForget // TODO Should be cancelable
         component.renderNoState(parameters)
     }
 
     lastParameters = parameters
     val proxy = createMiscProxy(
-      rc, { (proxy, misc) =>
+      rc,
+      (proxy, misc) =>
         misc match {
           case event: Event[F, CS, E] =>
-            val id = rc.currentContainerId
+            val id  = rc.currentContainerId
             val eid = EventId(id, event.`type`, event.phase)
-            val es = events.getOrElseUpdate(eid, Vector.empty)
+            val es  = events.getOrElseUpdate(eid, Vector.empty)
             events.put(eid, es :+ event)
             eventRegistry.registerEventType(event.`type`)
           case element: ElementId =>
@@ -312,7 +306,6 @@ final class ComponentInstance[
                 n.applyRenderContext(entry.parameters, proxy, snapshot)
             }
         }
-      }
     )
     node(proxy)
   }
@@ -321,17 +314,17 @@ final class ComponentInstance[
     for {
       maybeState <- stateManager.read[CS](nodeId)
       state <- maybeState
-        .orElse(component.initialState.toOption)
-        .fold(Effect[F].fail(new Exception("Uninitialized component state")): F[CS])(Effect[F].pure(_))
+                 .orElse(component.initialState.toOption)
+                 .fold(Effect[F].fail(new Exception("Uninitialized component state")): F[CS])(Effect[F].pure(_))
       newState <- transition(state)
-      _ <- stateManager.write(nodeId, newState)
+      _        <- stateManager.write(nodeId, newState)
     } yield newState
 
   private def applyTransition(transition: TransitionAsync[F, CS]): F[Unit] = {
     val effect = () =>
       for {
         newState <- applyTransitionEffect(transition)
-        _ <- stateQueue.enqueue(nodeId, newState, None)
+        _        <- stateQueue.enqueue(nodeId, newState, None)
       } yield ()
     pendingEffects.enqueue(effect)
   }
@@ -339,17 +332,16 @@ final class ComponentInstance[
   private def applyTransitionForce(transition: TransitionAsync[F, CS]): F[Unit] = Effect[F].promiseF[Unit] { cb =>
     val effect = () =>
       for {
-        newState <- applyTransitionEffect(transition).recoverF {
-          case e =>
-            cb(Left(e))
-            Effect[F].fail[CS](e)
-        }
+        newState <- applyTransitionEffect(transition).recoverF { case e =>
+                      cb(Left(e))
+                      Effect[F].fail[CS](e)
+                    }
         _ <- stateQueue.enqueue(nodeId, newState, Some(cb))
       } yield ()
     pendingEffects.enqueue(effect)
   }
 
-  type EventHandlers =  Vector[DomEventMessage => F[Boolean]]
+  type EventHandlers    = Vector[DomEventMessage => F[Boolean]]
   type AllEventHandlers = MapView[EventId, EventHandlers]
 
   def allEventHandlers: AllEventHandlers =
@@ -357,80 +349,74 @@ final class ComponentInstance[
       handlers.map { handler => (dem: DomEventMessage) =>
         handler
           .effect(BrowserAccess(dem))
-          .as(handler.stopPropagation)        
+          .as(handler.stopPropagation)
       }
-    } +++ nestedComponents
-      .values
+    } +++ nestedComponents.values
       .map(_.allEventHandlers)
       .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
 
   def eventHandlersFor(eventId: EventId): EventHandlers =
     events
-      .get(eventId).fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
+      .get(eventId)
+      .fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
         handlers.map { handler => (dem: DomEventMessage) =>
           handler
             .effect(BrowserAccess(dem))
             .as(handler.stopPropagation)
         }
-      } ++ nestedComponents
-      .values
+      } ++ nestedComponents.values
       .flatMap(_.eventHandlersFor(eventId))
 
   /**
-    * Remove all delays and nested component instances
-    * which were not marked during applying render context.
-    */
+   * Remove all delays and nested component instances which were not marked
+   * during applying render context.
+   */
   def dropObsoleteMisc(): Unit = miscLock.synchronized {
-    delays foreach {
-      case (id, delay) =>
-        if (!markedDelays.contains(id)) {
-          delays.remove(id)
-          delay.cancel()
-        }
+    delays foreach { case (id, delay) =>
+      if (!markedDelays.contains(id)) {
+        delays.remove(id)
+        delay.cancel()
+      }
     }
-    nestedComponents foreach {
-      case (id, nested) =>
-        if (!markedComponentInstances.contains(id)) {
-          nestedComponents.remove(id)
-          nested
-            .destroy()
-            .after(stateManager.delete(id))
-            .runAsyncForget
-        } else nested.dropObsoleteMisc()
+    nestedComponents foreach { case (id, nested) =>
+      if (!markedComponentInstances.contains(id)) {
+        nestedComponents.remove(id)
+        nested
+          .destroy()
+          .after(stateManager.delete(id))
+          .runAsyncForget
+      } else nested.dropObsoleteMisc()
     }
   }
 
   /**
-    * Prepares component instance to applying render context.
-    * Removes all temporary and obsolete misc.
-    * All nested components also will be prepared.
-    */
+   * Prepares component instance to applying render context. Removes all
+   * temporary and obsolete misc. All nested components also will be prepared.
+   */
   private def prepare(): Unit = {
     markedComponentInstances.clear()
     markedDelays.clear()
     elements.clear()
     events.clear()
     // Remove only finished delays
-    delays foreach {
-      case (id, delay) =>
-        if (delay.isFinished)
-          delays.remove(id)
+    delays foreach { case (id, delay) =>
+      if (delay.isFinished)
+        delays.remove(id)
     }
   }
 
   /**
-    * Close 'pendingEffects' in this component and
-    * all nested components.
-    *
-    * MUST be invoked after closing connection.
-    */
+   * Close 'pendingEffects' in this component and all nested components.
+   *
+   * MUST be invoked after closing connection.
+   */
   def destroy(): F[Unit] =
     for {
       _ <- pendingEffects.close()
       _ <- nestedComponents.values.toList
-        .map(_.destroy())
-        .sequence
-        .unit
+             .map(_.destroy())
+             .sequence
+             .unit
     } yield ()
 
   private def applyPendingEffect(f: () => F[Unit]): F[Unit] =
@@ -453,22 +439,20 @@ private object ComponentInstance {
 
   final class DelayInstance[F[_]: Effect, S, M](delay: Delay[F, S, M], scheduler: Scheduler[F], reporter: Reporter) {
 
-    @volatile private var handler = Option.empty[Scheduler.JobHandler[F, _]]
+    @volatile private var handler  = Option.empty[Scheduler.JobHandler[F, _]]
     @volatile private var finished = false
 
     def isFinished: Boolean = finished
 
-    def cancel(): Unit = {
+    def cancel(): Unit =
       handler.foreach(_.unsafeCancel())
-    }
 
-    def start(access: Access[F, S, M]): Unit = {
+    def start(access: Access[F, S, M]): Unit =
       handler = Some {
         scheduler.unsafeScheduleOnce(delay.duration) {
           finished = true
           delay.effect(access)
         }
       }
-    }
   }
 }

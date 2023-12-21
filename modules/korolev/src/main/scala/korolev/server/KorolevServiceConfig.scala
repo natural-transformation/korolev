@@ -16,14 +16,13 @@
 
 package korolev.server
 
+import korolev.{Context, Extension, Router}
 import korolev.effect.{Effect, Reporter}
 import korolev.state.IdGenerator
-import korolev.{Context, Extension, Router}
+import korolev.web.{Path, PathAndQuery}
 import levsha.Document
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
-
-import korolev.web.{Path, PathAndQuery}
 
 case class KorolevServiceConfig[F[_], S, M](
   stateLoader: StateLoader[F, S],
@@ -31,8 +30,13 @@ case class KorolevServiceConfig[F[_], S, M](
   http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]] = PartialFunction.empty[HttpRequest[F], F[HttpResponse[F]]],
   router: Router[F, S] = Router.empty[F, S],
   rootPath: Path = PathAndQuery.Root,
-  @deprecated("Use `document` instead of `render`. Do not use `render` and `document` together.", "0.16.0") render: S => Document.Node[Context.Binding[F, S, M]] = (_: S) => levsha.dsl.html.body(),
-  @deprecated("Add head() tag to `document`. Do not use `head` and `document` together.", "0.16.0") head: S => Seq[Document.Node[Context.Binding[F, S, M]]] = (_: S) => Seq.empty,
+  @deprecated(
+    "Use `document` instead of `render`. Do not use `render` and `document` together.",
+    "0.16.0"
+  ) render: S => Document.Node[Context.Binding[F, S, M]] = (_: S) => levsha.dsl.html.body(),
+  @deprecated("Add head() tag to `document`. Do not use `head` and `document` together.", "0.16.0") head: S => Seq[
+    Document.Node[Context.Binding[F, S, M]]
+  ] = (_: S) => Seq.empty,
   document: S => Document.Node[Context.Binding[F, S, M]] = null, // TODO (_: S) => levsha.dsl.html.Html(),
   connectionLostWidget: Document.Node[Context.Binding[F, S, M]] =
     KorolevServiceConfig.defaultConnectionLostWidget[Context.Binding[F, S, M]],

@@ -16,9 +16,9 @@
 
 package korolev.pekko.util
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.event.{LogSource, Logging}
 import korolev.effect.Reporter
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.event.{Logging, LogSource}
 
 final class LoggingReporter(actorSystem: ActorSystem) extends Reporter {
 
@@ -28,13 +28,13 @@ final class LoggingReporter(actorSystem: ActorSystem) extends Reporter {
 
   private val log = Logging(actorSystem, this)
 
-  def error(message: String, cause: Throwable): Unit = log.error(cause, message)
-  def error(message: String): Unit = log.error(message)
-  def warning(message: String, cause: Throwable): Unit = log.warning(s"$message: {}", cause)
-  def warning(message: String): Unit = log.warning(message)
-  def info(message: String): Unit = log.info(message)
-  def debug(message: String): Unit = log.debug(message)
-  def debug(message: String, arg1: Any): Unit = log.debug(message, arg1)
-  def debug(message: String, arg1: Any, arg2: Any): Unit = log.debug(message, arg1, arg2)
+  def error(message: String, cause: Throwable): Unit                = log.error(cause, message)
+  def error(message: String): Unit                                  = log.error(message)
+  def warning(message: String, cause: Throwable): Unit              = log.warning(s"$message: {}", cause)
+  def warning(message: String): Unit                                = log.warning(message)
+  def info(message: String): Unit                                   = log.info(message)
+  def debug(message: String): Unit                                  = log.debug(message)
+  def debug(message: String, arg1: Any): Unit                       = log.debug(message, arg1)
+  def debug(message: String, arg1: Any, arg2: Any): Unit            = log.debug(message, arg1, arg2)
   def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = log.debug(message, arg1, arg2, arg3)
 }

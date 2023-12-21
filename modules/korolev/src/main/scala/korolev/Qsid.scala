@@ -19,8 +19,8 @@ package korolev
 import korolev.state.{DeviceId, SessionId}
 
 /**
-  * Qualified Session Identifier
-  */
+ * Qualified Session Identifier
+ */
 case class Qsid(deviceId: DeviceId, sessionId: SessionId) {
   override lazy val toString: String =
     s"$deviceId-$sessionId"

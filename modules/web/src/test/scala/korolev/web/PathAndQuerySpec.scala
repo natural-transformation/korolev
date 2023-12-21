@@ -3,7 +3,6 @@ package korolev.web
 import korolev.web.PathAndQuery._
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-
 import scala.language.implicitConversions
 
 class PathAndQuerySpec extends AnyFlatSpec with Matchers {
@@ -124,9 +123,11 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
 
   ".++" should "correct concatenate complex path with query" in {
     val head = Root / "api" / "v1" / "system"
-    val tail = (Root / "admin" / "parameters" / "edit").withParam("k1","v1").withParam("k2","v2")
+    val tail = (Root / "admin" / "parameters" / "edit").withParam("k1", "v1").withParam("k2", "v2")
 
-    head ++ tail shouldBe (Root / "api" / "v1" / "system" / "admin" / "parameters" / "edit").withParam("k1","v1").withParam("k2","v2")
+    head ++ tail shouldBe (Root / "api" / "v1" / "system" / "admin" / "parameters" / "edit")
+      .withParam("k1", "v1")
+      .withParam("k2", "v2")
   }
 
   ".reverse" should "correct reverse Root path" in {
@@ -148,9 +149,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
   "path matching" should "correct extract parameters as a Map[String, String]" in {
     val path = Root / "test" :? "k1" -> "v1"
 
-    val pf: PartialFunction[PathAndQuery, Boolean] = {
-      case Root / "test" :?* params =>
-        params == Map("k1" -> "v1")
+    val pf: PartialFunction[PathAndQuery, Boolean] = { case Root / "test" :?* params =>
+      params == Map("k1" -> "v1")
     }
 
     pf(path) shouldBe true
@@ -174,9 +174,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
 
     val path = Root / "test" :? "k1" -> "v1"
 
-    val pf: PartialFunction[PathAndQuery, String] = {
-      case Root / "test" :?* K1(value) =>
-        value
+    val pf: PartialFunction[PathAndQuery, String] = { case Root / "test" :?* K1(value) =>
+      value
     }
 
     pf(path) shouldBe "v1"
@@ -199,9 +198,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
   "path matching" should "fail if mandatory parameter not found" in {
     object K1 extends QP("k1")
     val path = Root / "test" :? "k2" -> "v2"
-    val pf: PartialFunction[PathAndQuery, String] = {
-      case Root / "test" :?* K1(value) =>
-        value
+    val pf: PartialFunction[PathAndQuery, String] = { case Root / "test" :?* K1(value) =>
+      value
     }
 
     pf.isDefinedAt(path) shouldBe false
@@ -210,9 +208,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
   "path matching" should "not fail if optional not found" in {
     object K1 extends OQP("k1")
     val path = Root / "test" :? "k2" -> "v2"
-    val pf: PartialFunction[PathAndQuery, Boolean] = {
-      case Root / "test" :?* K1(_) =>
-        true
+    val pf: PartialFunction[PathAndQuery, Boolean] = { case Root / "test" :?* K1(_) =>
+      true
     }
 
     pf(path) shouldBe true
@@ -221,9 +218,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
   "path matching" should "correct match optional parameter" in {
     object K1 extends OQP("k1")
     val path = Root / "test" :? "k2" -> "v2"
-    val pf: PartialFunction[PathAndQuery, Option[String]] = {
-      case Root / "test" :?* K1(value) =>
-        value
+    val pf: PartialFunction[PathAndQuery, Option[String]] = { case Root / "test" :?* K1(value) =>
+      value
     }
 
     pf(path) shouldBe None
@@ -249,9 +245,8 @@ class PathAndQuerySpec extends AnyFlatSpec with Matchers {
     object K2 extends QP("k2")
     val path = Root / "test" :? "k2" -> "v2"
 
-    val pf: PartialFunction[PathAndQuery, (Option[String], String)] = {
-      case Root / "test" :?* K1(v1) *& K2(v2) =>
-        (v1, v2)
+    val pf: PartialFunction[PathAndQuery, (Option[String], String)] = { case Root / "test" :?* K1(v1) *& K2(v2) =>
+      (v1, v2)
     }
 
     pf(path) shouldBe (None, "v2")

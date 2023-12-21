@@ -20,28 +20,31 @@ import korolev.Context._
 import korolev.effect.Effect
 import korolev.state.{StateDeserializer, StateSerializer}
 import levsha.Document.Node
-
 import scala.util.Random
 
 /**
-  * Component definition. Every Korolev application is a component.
-  * Extent it to declare component in object oriented style.
-  *
-  * @param id Unique identifier of the component.
-  *           Use it when you create component declaration dynamically
-  *
-  * @tparam F Control monad
-  * @tparam S State of the component
-  * @tparam E Type of events produced by component
-  */
+ * Component definition. Every Korolev application is a component. Extent it to
+ * declare component in object oriented style.
+ *
+ * @param id
+ *   Unique identifier of the component. Use it when you create component
+ *   declaration dynamically
+ *
+ * @tparam F
+ *   Control monad
+ * @tparam S
+ *   State of the component
+ * @tparam E
+ *   Type of events produced by component
+ */
 abstract class Component[
-    F[_],
-    S,
-    P,
-    E
+  F[_],
+  S,
+  P,
+  E
 ](
-    val initialState: Either[P => F[S], S],
-    val id: String
+  val initialState: Either[P => F[S], S],
+  val id: String
 ) {
 
   def this(initialState: S) = this(Right(initialState), Component.randomId())
@@ -49,17 +52,17 @@ abstract class Component[
   def this(loadState: P => F[S]) = this(Left(loadState), Component.randomId())
 
   /**
-    * Component context.
-    *
-    * {{{
-    *  import context._
-    * }}}
-    */
+   * Component context.
+   *
+   * {{{
+   *   import context._
+   * }}}
+   */
   val context = Context[F, S, E]
 
   /**
-    * Component render
-    */
+   * Component render
+   */
   def render(parameters: P, state: S): context.Node
 
   /**
@@ -69,11 +72,9 @@ abstract class Component[
     levsha.dsl.html.div()
 
   /**
-   * Parameters may be changed.
-   * Maybe you want to reload state.
-   * The function returns optional effect.
-   * If no reload required it returns None,
-   * else it returns effect with new state.
+   * Parameters may be changed. Maybe you want to reload state. The function
+   * returns optional effect. If no reload required it returns None, else it
+   * returns effect with new state.
    */
   def maybeUpdateState(parameters: P, currentState: S): Option[F[S]] = None
 }
@@ -84,17 +85,19 @@ object Component {
   type Render[F[_], S, P, E] = (Context[F, S, E], P, S) => Node[Binding[F, S, E]]
 
   /**
-    * Create component in functional style
-    * @param f Component renderer
-    * @see [[Component]]
-    */
+   * Create component in functional style
+   * @param f
+   *   Component renderer
+   * @see
+   *   [[Component]]
+   */
   def apply[F[_]: Effect, S: StateSerializer: StateDeserializer, P, E](
-      initialState: S,
-      id: String = Component.randomId())(f: Render[F, S, P, E]): Component[F, S, P, E] = {
+    initialState: S,
+    id: String = Component.randomId()
+  )(f: Render[F, S, P, E]): Component[F, S, P, E] =
     new Component[F, S, P, E](initialState, id) {
       def render(parameters: P, state: S): Node[Binding[F, S, E]] = f(context, parameters, state)
     }
-  }
 
   final val TopLevelComponentId = "top-level"
 

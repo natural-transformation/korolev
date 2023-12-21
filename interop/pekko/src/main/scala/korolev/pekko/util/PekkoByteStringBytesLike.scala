@@ -1,10 +1,9 @@
 package korolev.pekko.util
 
-import org.apache.pekko.util.ByteString
-import korolev.data.BytesLike
-
 import java.nio.ByteBuffer
 import java.nio.charset.{Charset, StandardCharsets}
+import korolev.data.BytesLike
+import org.apache.pekko.util.ByteString
 
 final class PekkoByteStringBytesLike extends BytesLike[ByteString] {
 

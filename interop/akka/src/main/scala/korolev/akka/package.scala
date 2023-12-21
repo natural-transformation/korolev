@@ -28,12 +28,11 @@ import _root_.akka.util.ByteString
 import korolev.akka.util.LoggingReporter
 import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Effect, Reporter, Stream}
-import korolev.server.internal.BadRequestException
+import korolev.server.{HttpRequest as KorolevHttpRequest, KorolevService, KorolevServiceConfig}
 import korolev.server.{WebSocketRequest as KorolevWebSocketRequest, WebSocketResponse as KorolevWebSocketResponse}
-import korolev.server.{KorolevService, KorolevServiceConfig, HttpRequest as KorolevHttpRequest}
+import korolev.server.internal.BadRequestException
 import korolev.state.{StateDeserializer, StateSerializer}
 import korolev.web.{PathAndQuery, Request as KorolevRequest, Response as KorolevResponse}
-
 import scala.concurrent.{ExecutionContext, Future}
 
 package object akka {
@@ -42,91 +41,97 @@ package object akka {
 
   import instances._
 
-  def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
-      (config: KorolevServiceConfig[F, S, M], wsLoggingEnabled: Boolean = false)
-      (implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): AkkaHttpService = { akkaHttpConfig =>
-    // If reporter wasn't overridden, use akka-logging reporter.
-    val actualConfig =
-      if (config.reporter != Reporter.PrintReporter) config
-      else config.copy(reporter = new LoggingReporter(actorSystem))
+  def akkaHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
+    config: KorolevServiceConfig[F, S, M],
+    wsLoggingEnabled: Boolean = false
+  )(implicit actorSystem: ActorSystem, materializer: Materializer, ec: ExecutionContext): AkkaHttpService = {
+    akkaHttpConfig =>
+      // If reporter wasn't overridden, use akka-logging reporter.
+      val actualConfig =
+        if (config.reporter != Reporter.PrintReporter) config
+        else config.copy(reporter = new LoggingReporter(actorSystem))
 
-    val korolevServer = korolev.server.korolevService(actualConfig)
-    val wsRouter = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig, wsLoggingEnabled)
-    val httpRoute = configureHttpRoute(korolevServer)
+      val korolevServer = korolev.server.korolevService(actualConfig)
+      val wsRouter      = configureWsRoute(korolevServer, akkaHttpConfig, actualConfig, wsLoggingEnabled)
+      val httpRoute     = configureHttpRoute(korolevServer)
 
-    wsRouter ~ httpRoute
+      wsRouter ~ httpRoute
   }
 
-  private def configureWsRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M]
-      (korolevServer: KorolevService[F],
-       akkaHttpConfig: AkkaHttpServerConfig,
-       korolevServiceConfig: KorolevServiceConfig[F, S, M],
-       wsLoggingEnabled: Boolean)
-      (implicit materializer: Materializer, ec: ExecutionContext): Route =
+  private def configureWsRoute[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
+    korolevServer: KorolevService[F],
+    akkaHttpConfig: AkkaHttpServerConfig,
+    korolevServiceConfig: KorolevServiceConfig[F, S, M],
+    wsLoggingEnabled: Boolean
+  )(implicit materializer: Materializer, ec: ExecutionContext): Route =
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractWebSocketUpgrade { upgrade =>
           // inSink - consume messages from the client
           // outSource - push messages to the client
           val (inStream, inSink) = Sink.korolevStream[F, Bytes].preMaterialize()
-          val korolevRequest = mkKorolevRequest(request, path.toString, inStream)
+          val korolevRequest     = mkKorolevRequest(request, path.toString, inStream)
 
           complete {
             val korolevWsRequest = KorolevWebSocketRequest(korolevRequest, upgrade.requestedProtocols)
-            Effect[F].toFuture(korolevServer.ws(korolevWsRequest)).map {
-              case KorolevWebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
-                val source = outStream
-                    .asAkkaSource
+            Effect[F]
+              .toFuture(korolevServer.ws(korolevWsRequest))
+              .map {
+                case KorolevWebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
+                  val source = outStream.asAkkaSource
                     .map(text => BinaryMessage.Strict(text.as[ByteString]))
-                val sink = Flow[Message]
-                  .mapAsync(akkaHttpConfig.wsStreamedParallelism) {
-                    case TextMessage.Strict(message) =>
-                      Future.successful(Some(BytesLike[Bytes].utf8(message)))
-                    case TextMessage.Streamed(stream) =>
-                      stream
-                        .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
-                        .runFold("")(_ + _)
-                        .map(message => Some(BytesLike[Bytes].utf8(message)))
-                    case BinaryMessage.Strict(data) =>
-                      Future.successful(Some(Bytes.wrap(data)))
-                    case BinaryMessage.Streamed(stream) =>
-                      stream
-                        .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
-                        .runFold(ByteString.empty)(_ ++ _)
-                        .map(message => Some(Bytes.wrap(message)))
-                  }
-                  .recover {
-                    case ex =>
-                      korolevServiceConfig.reporter.error(s"WebSocket exception ${ex.getMessage}, shutdown output stream", ex)
+                  val sink = Flow[Message]
+                    .mapAsync(akkaHttpConfig.wsStreamedParallelism) {
+                      case TextMessage.Strict(message) =>
+                        Future.successful(Some(BytesLike[Bytes].utf8(message)))
+                      case TextMessage.Streamed(stream) =>
+                        stream
+                          .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
+                          .runFold("")(_ + _)
+                          .map(message => Some(BytesLike[Bytes].utf8(message)))
+                      case BinaryMessage.Strict(data) =>
+                        Future.successful(Some(Bytes.wrap(data)))
+                      case BinaryMessage.Streamed(stream) =>
+                        stream
+                          .completionTimeout(akkaHttpConfig.wsStreamedCompletionTimeout)
+                          .runFold(ByteString.empty)(_ ++ _)
+                          .map(message => Some(Bytes.wrap(message)))
+                    }
+                    .recover { case ex =>
+                      korolevServiceConfig.reporter.error(
+                        s"WebSocket exception ${ex.getMessage}, shutdown output stream",
+                        ex
+                      )
                       outStream.cancel()
                       None
-                  }
-                  .collect {
-                    case Some(message) =>
+                    }
+                    .collect { case Some(message) =>
                       message
-                  }
-                  .to(inSink)
+                    }
+                    .to(inSink)
 
-                upgrade.handleMessages(
-                  if(wsLoggingEnabled) {
-                    Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
-                  } else {
-                    Flow.fromSinkAndSourceCoupled(sink, source)
-                  },
-                  Some(selectedProtocol)
-                )
-              case _ =>
-                throw new RuntimeException // cannot happen
-            }.recover {
-              case BadRequestException(message) =>
+                  upgrade.handleMessages(
+                    if (wsLoggingEnabled) {
+                      Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
+                    } else {
+                      Flow.fromSinkAndSourceCoupled(sink, source)
+                    },
+                    Some(selectedProtocol)
+                  )
+                case _ =>
+                  throw new RuntimeException // cannot happen
+              }
+              .recover { case BadRequestException(message) =>
                 HttpResponse(StatusCodes.BadRequest, entity = HttpEntity(message))
-            }
+              }
           }
         }
       }
     }
 
-  private def configureHttpRoute[F[_]](korolevServer: KorolevService[F])(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
+  private def configureHttpRoute[F[_]](
+    korolevServer: KorolevService[F]
+  )(implicit mat: Materializer, async: Effect[F], ec: ExecutionContext): Route =
     extractUnmatchedPath { path =>
       extractRequest { request =>
         val sink = Sink.korolevStream[F, Bytes]
@@ -134,22 +139,18 @@ package object akka {
           if (request.method == HttpMethods.GET) {
             Stream.empty[F, Bytes]
           } else {
-            request
-              .entity
-              .dataBytes
+            request.entity.dataBytes
               .map(Bytes.wrap(_))
               .toMat(sink)(Keep.right)
               .run()
           }
         val korolevRequest = mkKorolevRequest(request, path.toString, body)
-        val responseF = handleHttpResponse(korolevServer, korolevRequest)
+        val responseF      = handleHttpResponse(korolevServer, korolevRequest)
         complete(responseF)
       }
     }
 
-  private def mkKorolevRequest[F[_], Body](request: HttpRequest,
-                                     path: String,
-                                     body: Body): KorolevRequest[Body] =
+  private def mkKorolevRequest[F[_], Body](request: HttpRequest, path: String, body: Body): KorolevRequest[Body] =
     KorolevRequest(
       pq = PathAndQuery.fromString(path).withParams(request.uri.rawQueryString),
       method = KorolevRequest.Method.fromString(request.method.value),
@@ -164,31 +165,35 @@ package object akka {
       body = body
     )
 
-  private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F],
-                                               korolevRequest: KorolevHttpRequest[F])(implicit ec: ExecutionContext): Future[HttpResponse] =
+  private def handleHttpResponse[F[_]: Effect](korolevServer: KorolevService[F], korolevRequest: KorolevHttpRequest[F])(
+    implicit ec: ExecutionContext
+  ): Future[HttpResponse] =
     Effect[F].toFuture(korolevServer.http(korolevRequest)).map {
       case response @ KorolevResponse(status, body, responseHeaders, _) =>
         val (contentTypeOpt, otherHeaders) = getContentTypeAndResponseHeaders(responseHeaders)
-        val bytesSource = body.asAkkaSource.map(_.as[ByteString])
+        val bytesSource                    = body.asAkkaSource.map(_.as[ByteString])
         HttpResponse(
           StatusCode.int2StatusCode(status.code),
           otherHeaders,
           response.contentLength match {
-            case Some(bytesLength) => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesLength, bytesSource)
+            case Some(bytesLength) =>
+              HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesLength, bytesSource)
             case None => HttpEntity(contentTypeOpt.getOrElse(ContentTypes.NoContentType), bytesSource)
           }
         )
     }
 
-  private def getContentTypeAndResponseHeaders(responseHeaders: Seq[(String, String)]): (Option[ContentType], List[HttpHeader]) = {
+  private def getContentTypeAndResponseHeaders(
+    responseHeaders: Seq[(String, String)]
+  ): (Option[ContentType], List[HttpHeader]) = {
     val headers = responseHeaders.map { case (name, value) =>
       HttpHeader.parse(name, value) match {
         case HttpHeader.ParsingResult.Ok(header, _) => header
-        case _ => RawHeader(name, value)
+        case _                                      => RawHeader(name, value)
       }
     }
     val (contentTypeHeaders, otherHeaders) = headers.partition(_.lowercaseName() == "content-type")
-    val contentTypeOpt = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
+    val contentTypeOpt                     = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
     (contentTypeOpt, otherHeaders.toList)
   }
 }

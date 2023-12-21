@@ -13,7 +13,8 @@ object ViewState {
       val default: Blog = {
         Blog(
           List(
-            Article(0,
+            Article(
+              0,
               """In the beginning, the creators of the Web designed browser
                 |as a thin client for web servers. The browser displayed
                 |hypertext pages received from a server. It was simple and
@@ -28,7 +29,8 @@ object ViewState {
                 Comment("Blog post is shit, author is an asshole", "Vitalij")
               )
             ),
-            Article(1,
+            Article(
+              1,
               """The modern approach of website development is the result
                 |of the increasing requirements to user interface interactivity.
                 |Tasks to improve interactivity fell on the shoulders of

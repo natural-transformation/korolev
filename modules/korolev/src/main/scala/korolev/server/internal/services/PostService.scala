@@ -28,26 +28,30 @@ import korolev.server.internal.FormDataCodec
 import korolev.server.internal.HttpResponse
 import korolev.web.Headers
 import korolev.web.Response
-
 import scala.concurrent.ExecutionContext
 
-private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
-                                                       sessionsService: SessionsService[F, _, _],
-                                                       commonService: CommonService[F],
-                                                       formDataCodec: FormDataCodec)
-                                                      (implicit ec: ExecutionContext) {
+private[korolev] final class PostService[F[_]: Effect](
+  reporter: Reporter,
+  sessionsService: SessionsService[F, _, _],
+  commonService: CommonService[F],
+  formDataCodec: FormDataCodec
+)(implicit ec: ExecutionContext) {
 
-  def formData(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], data: Stream[F, Bytes]): F[HttpResponse[F]] = {
+  def formData(
+    qsid: Qsid,
+    descriptor: String,
+    headers: Seq[(String, String)],
+    data: Stream[F, Bytes]
+  ): F[HttpResponse[F]] = {
 
-    def extractBoundary() = headers
-      .collectFirst { case (k, v) if k.toLowerCase == "content-type" && v.contains("multipart/form-data") => v }
-      .flatMap {
-        _.split(';')
-          .toList
-          .filter(_.contains('='))
-          .map(_.split('=').toList.map(_.trim))
-          .collectFirst { case "boundary" :: s :: Nil => s }
-      }
+    def extractBoundary() = headers.collectFirst {
+      case (k, v) if k.toLowerCase == "content-type" && v.contains("multipart/form-data") => v
+    }.flatMap {
+      _.split(';').toList
+        .filter(_.contains('='))
+        .map(_.split('=').toList.map(_.trim))
+        .collectFirst { case "boundary" :: s :: Nil => s }
+    }
       .fold(Effect[F].fail[String](new Exception("Content-Type should be `multipart/form-data`")))(Effect[F].pure)
 
     def parseFormData(formBytes: Bytes, boundary: String) = Effect[F].fork {
@@ -64,10 +68,10 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         for {
-          formBytes <- data.fold(Bytes.empty)(_ ++ _)
-          boundary <- extractBoundary()
+          formBytes       <- data.fold(Bytes.empty)(_ ++ _)
+          boundary        <- extractBoundary()
           errorOrFormData <- parseFormData(formBytes, boundary)
-          _ <- app.frontend.resolveFormData(descriptor, errorOrFormData)
+          _               <- app.frontend.resolveFormData(descriptor, errorOrFormData)
         } yield {
           commonService.simpleOkResponse
         }
@@ -100,23 +104,27 @@ private[korolev] final class PostService[F[_]: Effect](reporter: Reporter,
     }
   }
 
-  def downloadFile(qsid: Qsid, descriptor: String): F[HttpResponse[F]] = {
+  def downloadFile(qsid: Qsid, descriptor: String): F[HttpResponse[F]] =
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>
         app.frontend.resolveFileDownload(descriptor).flatMap {
           case Some(DownloadFileMeta(stream, maybeLength, mimeType)) =>
             val headers =
               (Headers.ContentType -> mimeType) ::
-              ("Accept-Ranges" -> "none") :: Nil
+                ("Accept-Ranges"   -> "none") :: Nil
             val response = Response(Response.Status.Ok, stream, headers, maybeLength)
             Effect[F].pure(response)
           case None => commonService.notFoundResponseF
         }
       case None => commonService.badRequest(ErrorSessionNotFound(qsid))
     }
-  }
 
-  def uploadFile(qsid: Qsid, descriptor: String, headers: Seq[(String, String)], body: Stream[F, Bytes]): F[HttpResponse[F]] = {
+  def uploadFile(
+    qsid: Qsid,
+    descriptor: String,
+    headers: Seq[(String, String)],
+    body: Stream[F, Bytes]
+  ): F[HttpResponse[F]] = {
     val (consumed, chunks) = body.handleConsumed
     sessionsService.getApp(qsid) flatMap {
       case Some(app) =>

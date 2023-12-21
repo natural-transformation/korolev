@@ -40,7 +40,8 @@ object Extension {
 
     /**
      * Invokes when message published.
-     * @see Context.BaseAccess.publish
+     * @see
+     *   Context.BaseAccess.publish
      */
     def onMessage(message: M): F[Unit] = Effect[F].unit
 
@@ -51,24 +52,31 @@ object Extension {
     def onDestroy(): F[Unit] = Effect[F].unit
   }
 
-  private final class HandlersImpl[F[_]: Effect, S, M](_onState: S => F[Unit],
-                                                       _onMessage: M => F[Unit],
-                                                       _onDestroy: () => F[Unit]) extends Handlers[F, S, M] {
-    override def onState(state: S): F[Unit] = _onState(state)
+  private final class HandlersImpl[F[_]: Effect, S, M](
+    _onState: S => F[Unit],
+    _onMessage: M => F[Unit],
+    _onDestroy: () => F[Unit]
+  ) extends Handlers[F, S, M] {
+    override def onState(state: S): F[Unit]     = _onState(state)
     override def onMessage(message: M): F[Unit] = _onMessage(message)
-    override def onDestroy(): F[Unit] = _onDestroy()
+    override def onDestroy(): F[Unit]           = _onDestroy()
   }
 
   object Handlers {
 
     /**
-     * @param onState Invokes when state updated.
-     * @param onMessage Invokes when message published.
-     * @param onDestroy Invokes when user closes tab.
+     * @param onState
+     *   Invokes when state updated.
+     * @param onMessage
+     *   Invokes when message published.
+     * @param onDestroy
+     *   Invokes when user closes tab.
      */
-    def apply[F[_]: Effect, S, M](onState: S => F[Unit] = null,
-                                  onMessage: M => F[Unit] = null,
-                                  onDestroy: () => F[Unit] = null): Handlers[F, S, M] =
+    def apply[F[_]: Effect, S, M](
+      onState: S => F[Unit] = null,
+      onMessage: M => F[Unit] = null,
+      onDestroy: () => F[Unit] = null
+    ): Handlers[F, S, M] =
       new HandlersImpl(
         if (onState == null) _ => Effect[F].unit else onState,
         if (onMessage == null) _ => Effect[F].unit else onMessage,

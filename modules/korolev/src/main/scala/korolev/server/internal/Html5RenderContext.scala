@@ -23,7 +23,7 @@ import levsha.{IdBuilder, RenderContext, XmlNs}
 import levsha.impl.TextPrettyPrintingConfig
 
 private[korolev] final class Html5RenderContext[F[_]: Effect, S, M](presetId: Boolean)
-  extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
+    extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
 
   private lazy val idb = IdBuilder()
 
@@ -33,7 +33,7 @@ private[korolev] final class Html5RenderContext[F[_]: Effect, S, M](presetId: Bo
       // Static pages always made from scratch
       component.initialState match {
         case Right(state) => component.render(parameters, state).apply(rc)
-        case Left(_) => component.renderNoState(parameters).apply(rc)
+        case Left(_)      => component.renderNoState(parameters).apply(rc)
       }
     case _ => ()
   }

@@ -20,13 +20,13 @@ package object korolev {
 
   // Routing API
   @inline val Root: PathAndQuery.Root.type = PathAndQuery.Root
-  @inline val / : PathAndQuery./.type = PathAndQuery./
-  @inline val :? : PathAndQuery.:?.type = PathAndQuery.:?
+  @inline val / : PathAndQuery./.type      = PathAndQuery./
+  @inline val :? : PathAndQuery.:?.type    = PathAndQuery.:?
   //@inline val :?? : PathAndQuery.:??.type = PathAndQuery.:??
   @inline val :?* : PathAndQuery.:?*.type = PathAndQuery.:?*
-  @inline val *& : PathAndQuery.*&.type = PathAndQuery.*&
-  @inline val :& : PathAndQuery.:&.type = PathAndQuery.:&
+  @inline val *& : PathAndQuery.*&.type   = PathAndQuery.*&
+  @inline val :& : PathAndQuery.:&.type   = PathAndQuery.:&
 
-  type Transition[S] = S => S
+  type Transition[S]            = S => S
   type TransitionAsync[F[_], S] = S => F[S]
 }

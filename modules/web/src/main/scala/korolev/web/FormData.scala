@@ -18,7 +18,6 @@ package korolev.web
 
 import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
-
 import korolev.web.FormData.Entry
 
 final case class FormData(content: Seq[Entry]) {
@@ -30,17 +29,15 @@ final case class FormData(content: Seq[Entry]) {
 
   def bytes(name: String): ByteBuffer = bytesOpt(name).get
 
-  def bytesOpt(name: String): Option[ByteBuffer] = {
+  def bytesOpt(name: String): Option[ByteBuffer] =
     apply(name).map(_.value)
-  }
 
-  def contentType(name: String): Option[String] = {
+  def contentType(name: String): Option[String] =
     apply(name) flatMap { entry =>
       entry.headers collectFirst {
         case (k, v) if k.toLowerCase == "content-type" => v
       }
     }
-  }
 
   def apply(name: String): Option[Entry] =
     content.find(_.name == name)

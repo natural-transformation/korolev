@@ -19,7 +19,7 @@ package korolev.pekko.util
 import korolev.effect.{Effect, Stream}
 import org.reactivestreams.{Subscriber, Subscription}
 
-final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Subscriber[T] {
+final class KorolevStreamSubscriber[F[_]: Effect, T] extends Stream[F, T] with Subscriber[T] {
 
   @volatile private var subscription: Subscription = _
 
@@ -39,13 +39,11 @@ final class KorolevStreamSubscriber[F[_]: Effect,T] extends Stream[F, T] with Su
     cb(Right(Some(value)))
   }
 
-  def onError(error: Throwable): Unit = {
+  def onError(error: Throwable): Unit =
     completeWith(Left(error))
-  }
 
-  def onComplete(): Unit = {
+  def onComplete(): Unit =
     completeWith(Right(None))
-  }
 
   private def completeWith(that: Either[Throwable, None.type]): Unit = {
     completeValue = that

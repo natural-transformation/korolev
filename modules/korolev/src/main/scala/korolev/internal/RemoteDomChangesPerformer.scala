@@ -19,7 +19,6 @@ package korolev.internal
 import korolev.internal.Frontend.ModifyDomProcedure
 import levsha.FastId
 import levsha.impl.DiffRenderContext.ChangesPerformer
-
 import scala.collection.mutable
 
 private[korolev] class RemoteDomChangesPerformer extends ChangesPerformer {
@@ -59,12 +58,11 @@ private[korolev] class RemoteDomChangesPerformer extends ChangesPerformer {
     buffer.append(',')
   }
 
-  private def appendXmlNs(xmlNs: String): Unit = {
+  private def appendXmlNs(xmlNs: String): Unit =
     if (xmlNs eq levsha.XmlNs.html.uri) {
       buffer.append('0')
       buffer.append(',')
     } else appendString(xmlNs)
-  }
 
   def remove(id: FastId): Unit = {
     append(ModifyDomProcedure.Remove.codeString)

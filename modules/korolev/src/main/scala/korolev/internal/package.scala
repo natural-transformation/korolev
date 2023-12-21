@@ -14,14 +14,13 @@ package object internal {
         def get(key: K): Option[V1] = left
           .get(key)
           .orElse(right.get(key))
-        def iterator: Iterator[(K, V1)] = left.iterator
-          .filter { case (k, _) => !right.contains(k) }
+        def iterator: Iterator[(K, V1)] = left.iterator.filter { case (k, _) => !right.contains(k) }
           .concat(right.iterator)
       }
-  }    
+  }
 
   private[korolev] def jsonEscape(sb: mutable.StringBuilder, s: String, unicode: Boolean): Unit = {
-    var i = 0
+    var i   = 0
     val len = s.length
     while (i < len) {
       (s.charAt(i): @switch) match {

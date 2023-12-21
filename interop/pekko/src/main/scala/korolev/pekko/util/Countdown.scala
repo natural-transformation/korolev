@@ -1,8 +1,7 @@
 package korolev.pekko.util
 
-import korolev.effect.Effect
-
 import java.util.concurrent.atomic.AtomicReference
+import korolev.effect.Effect
 import scala.annotation.tailrec
 
 final class Countdown[F[_]: Effect] {
@@ -34,7 +33,7 @@ final class Countdown[F[_]: Effect] {
     aux()
   }
 
-  def unsafeAdd(x: Long): Unit = {
+  def unsafeAdd(x: Long): Unit =
     // x should be positive
     if (x > 0) {
       @tailrec
@@ -55,7 +54,6 @@ final class Countdown[F[_]: Effect] {
       }
       aux()
     }
-  }
 
   def unsafeValue: Long = state.get().n
 }

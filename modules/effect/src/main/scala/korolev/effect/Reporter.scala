@@ -17,9 +17,8 @@
 package korolev.effect
 
 /**
-  * Korolev INTERNAL reporting subsystem.
-  * Do not use it in application code.
-  */
+ * Korolev INTERNAL reporting subsystem. Do not use it in application code.
+ */
 trait Reporter {
   implicit val Implicit: Reporter = this
   def error(message: String, cause: Throwable): Unit
@@ -37,10 +36,10 @@ trait Reporter {
 object Reporter {
 
   object Level extends Enumeration {
-    final val Debug = Value(0, "Debug")
-    final val Info = Value(1, "Info")
+    final val Debug   = Value(0, "Debug")
+    final val Info    = Value(1, "Info")
     final val Warning = Value(2, "Warning")
-    final val Error = Value(3, "Error")
+    final val Error   = Value(3, "Error")
   }
 
   final object PrintReporter extends Reporter {

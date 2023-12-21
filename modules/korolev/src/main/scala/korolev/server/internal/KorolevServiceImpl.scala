@@ -18,19 +18,20 @@ package korolev.server.internal
 
 import korolev.Qsid
 import korolev.effect.Effect
-import korolev.server.internal.services._
 import korolev.server._
+import korolev.server.internal.services._
 import korolev.web.PathAndQuery._
 
-private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]],
-                                                              commonService: CommonService[F],
-                                                              filesService: FilesService[F],
-                                                              messagingService: MessagingService[F],
-                                                              postService: PostService[F],
-                                                              ssrService: ServerSideRenderingService[F, _, _])
-    extends KorolevService[F] {
+private[korolev] final class KorolevServiceImpl[F[_]: Effect](
+  http: PartialFunction[HttpRequest[F], F[HttpResponse[F]]],
+  commonService: CommonService[F],
+  filesService: FilesService[F],
+  messagingService: MessagingService[F],
+  postService: PostService[F],
+  ssrService: ServerSideRenderingService[F, _, _]
+) extends KorolevService[F] {
 
-  def http(request: HttpRequest[F]): F[HttpResponse[F]] = {
+  def http(request: HttpRequest[F]): F[HttpResponse[F]] =
     (request.cookie(Cookies.DeviceId), request.pq) match {
 
       // Static files
@@ -63,19 +64,23 @@ private[korolev] final class KorolevServiceImpl[F[_]: Effect](http: PartialFunct
       case _ => http.applyOrElse(request, (_: HttpRequest[F]) => commonService.notFoundResponseF)
     }
 
-  }
-
-  def ws(wsRequest: WebSocketRequest[F]): F[WebSocketResponse[F]] = {
+  def ws(wsRequest: WebSocketRequest[F]): F[WebSocketResponse[F]] =
     (wsRequest.httpRequest.cookie(Cookies.DeviceId), wsRequest.httpRequest.pq) match {
       case (Some(deviceId), Root / "bridge" / "web-socket" / sessionId) =>
-        messagingService.webSocketMessaging(Qsid(deviceId, sessionId), wsRequest.httpRequest, wsRequest.httpRequest.body, wsRequest.protocols)
+        messagingService.webSocketMessaging(
+          Qsid(deviceId, sessionId),
+          wsRequest.httpRequest,
+          wsRequest.httpRequest.body,
+          wsRequest.protocols
+        )
       case _ =>
         webSocketBadRequestF
     }
-  }
 
   private val webSocketBadRequestF = {
-    val error = BadRequestException("Malformed request. Headers MUST contain deviceId cookie. Path MUST be '/bridge/web-socket/<session>'.")
+    val error = BadRequestException(
+      "Malformed request. Headers MUST contain deviceId cookie. Path MUST be '/bridge/web-socket/<session>'."
+    )
     Effect[F].fail[WebSocketResponse[F]](error)
   }
 }

@@ -18,39 +18,43 @@ package korolev.server.internal.services
 
 import korolev.effect.Effect
 import korolev.effect.syntax._
-import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
-import korolev.web.Response.Status
+import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
 import korolev.web.{Headers, PathAndQuery}
+import korolev.web.Response.Status
 
-private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](sessionsService: SessionsService[F, S, _],
-                                                                         pageService: PageService[F, S, M],
-                                                                         config: KorolevServiceConfig[F, S, M]) {
+private[korolev] final class ServerSideRenderingService[F[_]: Effect, S, M](
+  sessionsService: SessionsService[F, S, _],
+  pageService: PageService[F, S, M],
+  config: KorolevServiceConfig[F, S, M]
+) {
 
   def canBeRendered(pq: PathAndQuery): Boolean =
     config.router.toState.isDefinedAt(pq)
 
-  def serverSideRenderedPage(request: HttpRequest[F]): F[HttpResponse[F]] = {
-
+  def serverSideRenderedPage(request: HttpRequest[F]): F[HttpResponse[F]] =
     for {
-      qsid <- sessionsService.initSession(request)
+      qsid  <- sessionsService.initSession(request)
       state <- sessionsService.initAppState(qsid, request)
-      rc = new Html5RenderContext[F, S, M](config.presetIds)
-      proxy = pageService.setupStatelessProxy(rc, qsid)
-      _ = rc.builder.append("<!DOCTYPE html>\n")
-      _ = config.document(state)(proxy)
+      rc     = new Html5RenderContext[F, S, M](config.presetIds)
+      proxy  = pageService.setupStatelessProxy(rc, qsid)
+      _      = rc.builder.append("<!DOCTYPE html>\n")
+      _      = config.document(state)(proxy)
       response <- HttpResponse(
-        Status.Ok,
-        rc.mkString,
-        Seq(
-          Headers.ContentTypeHtmlUtf8,
-          Headers.CacheControlNoCache,
-          Headers.setCookie(Cookies.DeviceId, qsid.deviceId, config.rootPath.mkString,
-          maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */)
-        )
-      )
+                    Status.Ok,
+                    rc.mkString,
+                    Seq(
+                      Headers.ContentTypeHtmlUtf8,
+                      Headers.CacheControlNoCache,
+                      Headers.setCookie(
+                        Cookies.DeviceId,
+                        qsid.deviceId,
+                        config.rootPath.mkString,
+                        maxAge = 60 * 60 * 24 * 365 * 10 /* 10 years */
+                      )
+                    )
+                  )
     } yield {
       response
     }
-  }
 }

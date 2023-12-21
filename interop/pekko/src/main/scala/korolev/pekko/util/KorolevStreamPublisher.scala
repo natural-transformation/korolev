@@ -16,16 +16,15 @@
 
 package korolev.pekko.util
 
-import korolev.pekko.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException
-import korolev.effect.syntax._
 import korolev.effect.{Effect, Hub, Reporter, Stream}
+import korolev.effect.syntax._
+import korolev.pekko.util.KorolevStreamPublisher.MultipleSubscribersProhibitedException
 import org.reactivestreams.{Publisher, Subscriber, Subscription}
-
 import scala.concurrent.ExecutionContext
 
-final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
-                                                     fanout: Boolean)
-                                                    (implicit ec: ExecutionContext) extends Publisher[T] {
+final class KorolevStreamPublisher[F[_]: Effect, T](stream: Stream[F, T], fanout: Boolean)(implicit
+  ec: ExecutionContext
+) extends Publisher[T] {
 
   private implicit val reporter: Reporter = Reporter.PrintReporter
 
@@ -35,39 +34,36 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
     if (fanout) Hub(stream)
     else null
 
-  private final class StreamSubscription(stream: Stream[F, T],
-                                         subscriber: Subscriber[_ >: T]) extends Subscription {
+  private final class StreamSubscription(stream: Stream[F, T], subscriber: Subscriber[_ >: T]) extends Subscription {
 
     private val countdown = new Countdown[F]()
 
     private def loop(): F[Unit] =
       for {
-        _ <- countdown.decOrLock()
+        _         <- countdown.decOrLock()
         maybeItem <- stream.pull()
         _ <- maybeItem match {
-          case Some(item) =>
-            subscriber.onNext(item)
-            loop()
-          case None =>
-            subscriber.onComplete()
-            Effect[F].unit
-        }
+               case Some(item) =>
+                 subscriber.onNext(item)
+                 loop()
+               case None =>
+                 subscriber.onComplete()
+                 Effect[F].unit
+             }
       } yield ()
 
     loop().runAsync {
       case Left(error) => subscriber.onError(error)
-      case Right(_) => ()
+      case Right(_)    => ()
     }
 
-    def request(n: Long): Unit = {
+    def request(n: Long): Unit =
       countdown.unsafeAdd(n)
-    }
 
-    def cancel(): Unit = {
+    def cancel(): Unit =
       stream
         .cancel()
         .runAsyncForget
-    }
   }
 
   def subscribe(subscriber: Subscriber[_ >: T]): Unit = {
@@ -87,5 +83,5 @@ final class KorolevStreamPublisher[F[_] : Effect, T](stream: Stream[F, T],
 
 object KorolevStreamPublisher {
   final case class MultipleSubscribersProhibitedException()
-    extends Exception("Multiple subscribers prohibited for this KorolevStreamPublisher")
+      extends Exception("Multiple subscribers prohibited for this KorolevStreamPublisher")
 }

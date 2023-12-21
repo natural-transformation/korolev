@@ -21,8 +21,8 @@ import korolev.effect.{AsyncTable, Effect, Stream}
 import korolev.effect.io.JavaIO
 import korolev.effect.syntax._
 import korolev.server.HttpResponse
-import korolev.web.PathAndQuery._
 import korolev.web.{Headers, MimeTypes, Path, PathAndQuery, Response}
+import korolev.web.PathAndQuery._
 
 private[korolev] final class FilesService[F[_]: Effect](commonService: CommonService[F]) {
 
@@ -36,7 +36,7 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
     val path = pq.asPath
     table
       .getFill(path) {
-        val fsPath = path.mkString
+        val fsPath              = path.mkString
         val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
         maybeResourceStream.fold(notFoundToken) { javaSyncStream =>
           val _ / fileName = path
@@ -51,10 +51,10 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
           val size = javaSyncStream.available().toLong
           for {
             stream <- JavaIO.fromInputStream[F, Bytes](javaSyncStream) // TODO configure chunk size
-            chunks <- stream.fold(Vector.empty[Bytes])(_ :+ _)
+            chunks  <- stream.fold(Vector.empty[Bytes])(_ :+ _)
             template = Stream.emits(chunks)
-          } yield {
-            () => template.mat() map { stream =>
+          } yield { () =>
+            template.mat() map { stream =>
               Response(Response.Status.Ok, stream, headers, Some(size))
             }
           }

@@ -16,19 +16,18 @@
 
 package korolev
 
-import korolev.effect.Effect
 import _root_.zio.*
-import korolev.data.BytesLike
-
 import java.nio.ByteBuffer
 import java.nio.charset.{Charset, StandardCharsets}
+import korolev.data.BytesLike
+import korolev.effect.Effect
 
 package object zio {
 
   /**
-    * Provides [[Effect]] instance for ZIO[Any, Throwable, *].
-    * Use this method if your app uses [[Throwable]] to express errors.
-    */
+   * Provides [[Effect]] instance for ZIO[Any, Throwable, *]. Use this method if
+   * your app uses [[Throwable]] to express errors.
+   */
   def taskEffectInstance[R](runtime: Runtime[R]): Effect[Task] =
     new Zio2Effect[Any, Throwable](runtime, identity, identity)
 
@@ -36,30 +35,29 @@ package object zio {
     ZLayer(ZIO.runtime.map(taskEffectInstance))
 
   /**
-    * Provides [[Effect]] instance for ZIO with arbitrary runtime
-    * and error types. Korolev uses Throwable inside itself.
-    * That means if you want to work with your own [[E]],
-    * you should provide functions to convert [[Throwable]]
-    * to [[E]] and vice versa.
-    *
-    * {{{
-    *   sealed trait MyError
-    *   object MyError {
-    *     case class UserNotFound(id: Long) extends MyError
-    *     case object DoNotLikeIt extends MyError
-    *     case class Unexpected(e: Throwable) extends MyError
-    *   }
-    *   case class MyErrorException(error: MyError) extends Throwable
-    *
-    *   val runtime = new DefaultRuntime {}
-    *   implicit val zioEffect = korolev.zio.zioEffectInstance(runtime)(MyError.Unexpected)(MyErrorException)
-    *
-    *   val ctx = Context[IO[MyError, *], MyState, Any]
-    * }}}
-    */
-  final def zioEffectInstance[R, E](runtime: Runtime[R])
-                                   (liftError: Throwable => E)
-                                   (unliftError: E => Throwable): Effect[ZIO[R, E, *]] =
+   * Provides [[Effect]] instance for ZIO with arbitrary runtime and error
+   * types. Korolev uses Throwable inside itself. That means if you want to work
+   * with your own [[E]], you should provide functions to convert [[Throwable]]
+   * to [[E]] and vice versa.
+   *
+   * {{{
+   *   sealed trait MyError
+   *   object MyError {
+   *     case class UserNotFound(id: Long) extends MyError
+   *     case object DoNotLikeIt extends MyError
+   *     case class Unexpected(e: Throwable) extends MyError
+   *   }
+   *   case class MyErrorException(error: MyError) extends Throwable
+   *
+   *   val runtime = new DefaultRuntime {}
+   *   implicit val zioEffect = korolev.zio.zioEffectInstance(runtime)(MyError.Unexpected)(MyErrorException)
+   *
+   *   val ctx = Context[IO[MyError, *], MyState, Any]
+   * }}}
+   */
+  final def zioEffectInstance[R, E](runtime: Runtime[R])(liftError: Throwable => E)(
+    unliftError: E => Throwable
+  ): Effect[ZIO[R, E, *]] =
     new Zio2Effect[R, E](runtime, liftError, unliftError)
 
   implicit object ChunkBytesLike extends BytesLike[Chunk[Byte]] {
@@ -99,12 +97,17 @@ package object zio {
       builder.result()
     }
 
-    override def copyToArray(value: Chunk[Byte], array: Array[Byte], sourceOffset: Int, targetOffset: Int, length: Int): Unit = {
+    override def copyToArray(
+      value: Chunk[Byte],
+      array: Array[Byte],
+      sourceOffset: Int,
+      targetOffset: Int,
+      length: Int
+    ): Unit =
       // TODO optimize me
       for (i <- sourceOffset until length) {
         array(targetOffset + i) = value(i)
       }
-    }
 
     override def asAsciiString(bytes: Chunk[Byte]): String =
       StandardCharsets.US_ASCII.decode(asBuffer(bytes)).toString
@@ -142,7 +145,7 @@ package object zio {
 
     override def mapWithIndex(bytes: Chunk[Byte], f: (Byte, Long) => Byte): Chunk[Byte] = {
       val builder = Chunk.newBuilder[Byte]
-      var i = 0L
+      var i       = 0L
       bytes.foreach { x =>
         val res = f(x, i)
         builder += (res)
