@@ -24,7 +24,7 @@
         };
         newPkgs = import nixpkgs {
           inherit system;
-          overlays = [ jdk21-overlay ];
+          # overlays = [ jdk21-overlay ];
         };
         libPath = nixpkgs.lib.makeLibraryPath [ newPkgs.lmdb ];
         sbtixPkg = import sbtix { pkgs = newPkgs; };
