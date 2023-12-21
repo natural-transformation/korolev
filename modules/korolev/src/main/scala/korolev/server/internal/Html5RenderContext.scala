@@ -19,11 +19,15 @@ package korolev.server.internal
 import korolev.Context
 import korolev.Context._
 import korolev.effect.Effect
-import levsha.RenderContext
+import levsha.{IdBuilder, RenderContext, XmlNs}
 import levsha.impl.TextPrettyPrintingConfig
 
-private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
+private[korolev] final class Html5RenderContext[F[_]: Effect, S, M](presetId: Boolean)
     extends levsha.impl.Html5RenderContext[Binding[F, S, M]](TextPrettyPrintingConfig.noPrettyPrinting) {
+
+  private lazy val idb = IdBuilder()
+
+  private lazy val idb = IdBuilder()
 
   override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
@@ -36,4 +40,22 @@ private[korolev] final class Html5RenderContext[F[_]: Effect, S, M]
     case _ => ()
   }
 
+  override def openNode(xmlns: XmlNs, name: String): Unit = {
+    if (presetId) idb.incId()
+    super.openNode(xmlns, name)
+    if (presetId) {
+      super.setAttr(xmlns, "k", idb.mkId.toList.last.toString)
+      idb.incLevel()
+    }
+  }
+
+  override def closeNode(name: String): Unit = {
+    super.closeNode(name)
+    if (presetId) idb.decLevel()
+  }
+
+  override def addTextNode(text: String): Unit = {
+    if (presetId) idb.incId()
+    super.addTextNode(text)
+  }
 }

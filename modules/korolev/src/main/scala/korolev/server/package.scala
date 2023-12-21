@@ -21,6 +21,7 @@ import korolev.data.Bytes
 import korolev.effect.{Effect, Stream}
 import korolev.server.internal.{FormDataCodec, KorolevServiceImpl}
 import korolev.server.internal.services._
+import korolev.server.internal.services._
 import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
 import korolev.web.{Request, Response}
 import korolev.web.Request.Head
@@ -28,6 +29,7 @@ import scala.concurrent.ExecutionContext
 
 package object server {
 
+  type HttpRequest[F[_]]  = Request[Stream[F, Bytes]]
   type HttpRequest[F[_]]  = Request[Stream[F, Bytes]]
   type HttpResponse[F[_]] = Response[Stream[F, Bytes]]
 

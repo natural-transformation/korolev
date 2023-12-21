@@ -27,7 +27,10 @@ export class Connection {
     this._useSSL = location.protocol === "https:";
 
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
+    /** @type {?WebSocket} */
     this._webSocket = null;
+    /** @type {?TextEncoder} */
+    this._textEncoder = null;
     this._webSocketsSupported = window.WebSocket !== undefined;
     this._connectionType = ConnectionType.LONG_POLLING;
     this._wasConnected = false;
@@ -77,6 +80,7 @@ export class Connection {
   /** @private */
   _connectUsingWebSocket() {
 
+    let messages = []; // Message processing queue
     let url = (this._useSSL ? "wss://" : "ws://") + this._hostPort;
     let path = this._serverRootPath + `bridge/web-socket/${this._sessionId}`;
     let uri = url + path;
@@ -87,6 +91,8 @@ export class Connection {
       protocols.push('json-deflate');
     }
 
+    /** @type {Promise} */
+    this._processing = null;
     this._textEncoder = new TextEncoder();
     this._webSocket = new WebSocket(uri, protocols);
     this._webSocket.binaryType = 'blob';
@@ -105,8 +111,8 @@ export class Connection {
     this._webSocket.addEventListener('open', (event) => this._onOpen());
     this._webSocket.addEventListener('close', (event) => this._onClose());
     this._webSocket.addEventListener('error', (event) => this._onError());
-    this._webSocket.addEventListener('message', async (event) => {
-      let data = event.data;
+
+    let processMessage = async (data) => {
       if (data instanceof Blob) {
         if (this._webSocket.protocol == 'json-deflate') {
           let stream = data
@@ -130,6 +136,27 @@ export class Connection {
       } else {
         this._onMessage(data);
       }
+    }
+
+    let tryProcessMessage = async () => {
+      if (this._processing || messages.length == 0) {
+        return false;
+      }
+
+      this._processing = new Promise(async (resolve) => {
+        while (messages.length > 0) {
+          const message = messages.shift();
+          await processMessage(message);
+        }
+
+        this._processing = null;
+        resolve()
+      });
+    }
+
+    this._webSocket.addEventListener('message', (event) => {
+      messages.push(event.data);
+      tryProcessMessage();
     });
 
     console.log(`Trying to open connection to ${uri} using WebSocket`);
@@ -219,8 +246,13 @@ export class Connection {
   }
 
   /** @private */
-  _onClose() {
+  async _onClose() {
     console.log('Connection closed');
+    if (this._processing) {
+      console.log('Await processing last message')
+      await this._processing;
+    }
+
     let event = this._createEvent('close');
     this._dispatcher.dispatchEvent(event);
     if (this._reconnect) {
@@ -248,11 +280,10 @@ export class Connection {
   /**
    * @param {boolean} reconnect
    */
-  disconnect(reconnect = true) {
+  async disconnect(reconnect = true) {
     this._reconnect = reconnect;
     if (this._webSocket != null) {
         this._webSocket.close();
-        this._onClose();
     } else {
         console.log("Disconnect allowed only for WebSocket connections")
     }

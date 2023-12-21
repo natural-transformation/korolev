@@ -45,8 +45,8 @@ private[korolev] final class PostService[F[_]: Effect](
     }.flatMap {
       _.split(';').toList
         .filter(_.contains('='))
-        .map(_.split('=').map(_.trim))
-        .collectFirst { case Array("boundary", s) => s }
+        .map(_.split('=').toList.map(_.trim))
+        .collectFirst { case "boundary" :: s :: Nil => s }
     }
       .fold(Effect[F].fail[String](new Exception("Content-Type should be `multipart/form-data`")))(Effect[F].pure)
 

@@ -229,15 +229,12 @@ class Http11[B: BytesLike] {
       .append(' ')
       .append(status.phrase)
       .append(NewLine)
-
-    def putHeader(name: String, value: String): Unit =
-      builder
-        .append(name)
-        .append(':')
-        .append(' ')
-        .append(value)
-        .append(NewLine)
-
+    def putHeader(name: String, value: String) = builder
+      .append(name)
+      .append(':')
+      .append(' ')
+      .append(value)
+      .append(NewLine)
     headers.foreach { case (name, value) =>
       putHeader(name, value)
     }

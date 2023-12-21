@@ -13,16 +13,26 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
   type B = Binding[F, S, M]
 
   private val clw = {
-    val rc = new Html5RenderContext[F, S, M]()
+    val rc = new Html5RenderContext[F, S, M](config.presetIds)
     config.connectionLostWidget(rc)
     rc.mkString
   }
 
   def appendScripts(rc: RenderContext[_], qsid: Qsid): Unit = {
-    val rp                = config.rootPath
-    val heartbeatInterval = config.heartbeatInterval.toMillis
+    val rp = config.rootPath
+    val heartbeat: String = {
+      val interval = config.heartbeatInterval.toMillis
+
+      config.heartbeatLimit match {
+        case Some(limit) =>
+          s"{interval:$interval,limit:$limit}"
+        case None =>
+          s"{interval:$interval}"
+      }
+    }
+    val presetIds = if (config.presetIds) ",kid:true" else ""
     val kfg =
-      s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeatInterval:$heartbeatInterval}"
+      s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds}"
 
     rc.openNode(XmlNs.html, "script")
     rc.addTextNode(kfg)

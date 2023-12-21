@@ -18,10 +18,29 @@ export class Bridge {
 
     connection.dispatcher.addEventListener("message", this._messageHandler);
 
-    let interval = parseInt(config['heartbeatInterval'], 10);
+    let interval = parseInt(config['heartbeat']['interval'], 10);
 
     if (interval > 0) {
-      this._intervalId = setInterval(() => this._onCallback(CallbackType.HEARTBEAT), interval);
+      if (config['heartbeat']['limit']) {
+        this._heartbeatLimit = parseInt(config['heartbeat']['limit'], 10)
+        this._awaitingHeartbeat = 0
+      }
+
+      this._intervalId = setInterval(() => {
+        if (this._heartbeatLimit) {
+          this._awaitingHeartbeat += 1
+
+          if (this._awaitingHeartbeat === this._heartbeatLimit) {
+            console.log('Too many lost heartbeats, reloading')
+            this._connection.disconnect(false);
+            window.location.reload();
+          } else {
+            this._onCallback(CallbackType.HEARTBEAT)
+          }
+        } else {
+          this._onCallback(CallbackType.HEARTBEAT)
+        }
+      }, interval);
     }
   }
 
@@ -43,7 +62,7 @@ export class Bridge {
     let pCode = commands.shift();
     let k = this._korolev;
     switch (pCode) {
-      case 0: k.setRenderNum.apply(k, commands); break;
+      case 0: k.setEventCounter.apply(k, commands); break;
       case 1:
         this._connection.disconnect(false);
         window.location.reload();
@@ -62,6 +81,8 @@ export class Bridge {
       case 13: k.uploadFile.apply(k, commands); break;
       case 14: k.resetForm.apply(k, commands); break;
       case 15: k.downloadFile.apply(k, commands); break;
+      case 16: this._awaitingHeartbeat -= 1;break;
+      case 17: k.resetEventCounters.apply(k, commands); break;
       default: console.error(`Procedure ${pCode} is undefined`);
     }
   }

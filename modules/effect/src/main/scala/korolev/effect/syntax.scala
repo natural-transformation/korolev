@@ -24,32 +24,34 @@ object syntax {
     def sequence: F[List[A]] = Effect[F].sequence(effects)
   }
 
-  implicit final class EffectOps[F[_]: Effect, A](effect: F[A]) {
+  implicit final class EffectOps[F[_], A](val effect: F[A]) extends AnyVal {
 
-    def map[B](f: A => B): F[B] = Effect[F].map(effect)(f)
+    def map[B](f: A => B)(implicit ef: Effect[F]): F[B] = Effect[F].map(effect)(f)
 
     /**
      * Alias for {{{.flatMap(_ => ())}}}
      */
-    def unit: F[Unit] = Effect[F].map(effect)(_ => ())
+    def unit(implicit ef: Effect[F]): F[Unit] = Effect[F].map(effect)(_ => ())
 
-    def flatMap[B](f: A => F[B]): F[B] = Effect[F].flatMap(effect)(f)
+    def flatMap[B](f: A => F[B])(implicit ef: Effect[F]): F[B] = Effect[F].flatMap(effect)(f)
 
     /**
      * Alias for [[after]]
      */
-    def *>[B](fb: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => fb)
+    def *>[B](fb: => F[B])(implicit ef: Effect[F]): F[B] = Effect[F].flatMap(effect)(_ => fb)
 
-    def as[B](b: B): F[B] = Effect[F].map(effect)(_ => b)
+    def as[B](b: B)(implicit ef: Effect[F]): F[B] = Effect[F].map(effect)(_ => b)
 
     /**
      * Do 'm' right after [[effect]]
      */
-    def after[B](m: => F[B]): F[B] = Effect[F].flatMap(effect)(_ => m)
+    def after[B](m: => F[B])(implicit ef: Effect[F]): F[B] = Effect[F].flatMap(effect)(_ => m)
 
-    def recover[AA >: A](f: PartialFunction[Throwable, AA]): F[AA] = Effect[F].recover[A, AA](effect)(f)
+    def recover[AA >: A](f: PartialFunction[Throwable, AA])(implicit ef: Effect[F]): F[AA] =
+      Effect[F].recover[A, AA](effect)(f)
 
-    def recoverF[AA >: A](f: PartialFunction[Throwable, F[AA]]): F[AA] = Effect[F].recoverF[A, AA](effect)(f)
+    def recoverF[AA >: A](f: PartialFunction[Throwable, F[AA]])(implicit ef: Effect[F]): F[AA] =
+      Effect[F].recoverF[A, AA](effect)(f)
 
 //    def onError(f: Throwable => Unit): F[A] =
 //      Effect[F].onError(effect)(f)
@@ -57,22 +59,22 @@ object syntax {
 //    def onErrorF(f: Throwable => F[Unit]): F[A] =
 //      Effect[F].onErrorF(effect)(f)
 
-    def start(implicit ec: ExecutionContext): F[Effect.Fiber[F, A]] = Effect[F].start(effect)
+    def start(implicit ec: ExecutionContext, ef: Effect[F]): F[Effect.Fiber[F, A]] = Effect[F].start(effect)
 
-    def runAsync(f: Either[Throwable, A] => Unit): Unit = Effect[F].runAsync(effect)(f)
+    def runAsync(f: Either[Throwable, A] => Unit)(implicit ef: Effect[F]): Unit = Effect[F].runAsync(effect)(f)
 
-    def runAsyncSuccess(f: A => Unit)(implicit er: Reporter): Unit =
+    def runAsyncSuccess(f: A => Unit)(implicit er: Reporter, ef: Effect[F]): Unit =
       Effect[F].runAsync(effect) {
         case Right(x) => f(x)
         case Left(e)  => er.error("Unhandled error", e)
       }
-    def runSyncForget(implicit reporter: Reporter): Unit =
+    def runSyncForget(implicit reporter: Reporter, ef: Effect[F]): Unit =
       Effect[F].run(effect) match {
         case Left(value)  => reporter.error("Unhandled error", value)
         case Right(value) => ()
       }
 
-    def runAsyncForget(implicit er: Reporter): Unit =
+    def runAsyncForget(implicit er: Reporter, ef: Effect[F]): Unit =
       Effect[F].runAsync(effect) {
         case Right(_) => // do nothing
         case Left(e)  => er.error("Unhandled error", e)

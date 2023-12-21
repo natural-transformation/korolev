@@ -16,16 +16,26 @@
 
 package korolev.internal
 
+import Context.*
 import korolev.*
 import korolev.Context.*
 import korolev.data.Bytes
 import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax.*
-import korolev.state.{StateDeserializer, StateManager, StateSerializer}
-import korolev.util.{JsCode, Lens}
+import korolev.internal.Frontend.DomEventMessage
+import korolev.state.StateDeserializer
+import korolev.state.StateManager
+import korolev.state.StateSerializer
+import korolev.util.JsCode
+import korolev.util.Lens
 import korolev.web.FormData
-import levsha.{Id, StatefulRenderContext}
+import levsha.Id
+import levsha.StatefulRenderContext
 import levsha.events.EventId
+import levsha.events.EventPhase
+import scala.collection.AbstractMapView
+import scala.collection.MapView
+import scala.collection.concurrent.TrieMap
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 import scala.util.control.NonFatal
@@ -56,7 +66,6 @@ final class ComponentInstance[
   frontend: Frontend[F],
   eventRegistry: EventRegistry[F],
   stateManager: StateManager[F],
-  getRenderNum: () => Int,
   val component: Component[F, CS, P, E],
   stateQueue: Queue[F, (Id, Any, Option[Effect.Promise[Unit]])],
   createMiscProxy: (
@@ -73,6 +82,7 @@ final class ComponentInstance[
 
   private val miscLock = new Object()
 
+  private var lastParameters: P        = _
   private val markedDelays             = mutable.Set.empty[Id] // Set of the delays which are should survive
   private val markedComponentInstances = mutable.Set.empty[Id]
   private val delays                   = mutable.Map.empty[Id, DelayInstance[F, CS, E]]
@@ -87,7 +97,7 @@ final class ComponentInstance[
 
   @volatile private var eventSubscription = Option.empty[E => _]
 
-  private[korolev] object browserAccess extends BaseAccessDefault[F, CS, E] {
+  private[korolev] case class BrowserAccess(dem: DomEventMessage) extends BaseAccessDefault[F, CS, E] {
 
     private def getId(elementId: ElementId): F[Id] = Effect[F].delay {
       unsafeGetId(elementId)
@@ -138,12 +148,9 @@ final class ComponentInstance[
 
     def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)
 
-    def transition(f: Transition[CS]): F[Unit] = applyTransition(x => Effect[F].pure(f(x)))
-
-    def transitionForce(f: Transition[CS]): F[Unit] = applyTransitionForce(x => Effect[F].pure(f(x)))
-
-    def transitionAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransition(f)
-
+    def transition(f: Transition[CS]): F[Unit]                   = applyTransition(x => Effect[F].pure(f(x)))
+    def transitionForce(f: Transition[CS]): F[Unit]              = applyTransitionForce(x => Effect[F].pure(f(x)))
+    def transitionAsync(f: TransitionAsync[F, CS]): F[Unit]      = applyTransition(f)
     def transitionForceAsync(f: TransitionAsync[F, CS]): F[Unit] = applyTransitionForce(f)
 
     def downloadFormData(element: ElementId): F[FormData] =
@@ -202,11 +209,13 @@ final class ComponentInstance[
     def evalJs(code: JsCode): F[String] =
       frontend.evalJs(code.mkString(unsafeGetId))
 
-    def eventData: F[String] = frontend.extractEventData(getRenderNum())
+    def eventData: F[String] = frontend.extractEventData(dem)
 
     def registerCallback(name: String)(f: String => F[Unit]): F[Unit] =
       frontend.registerCustomCallback(name)(f)
   }
+
+  private[korolev] val browserAccess = BrowserAccess(DomEventMessage(0, Id.TopLevel, "init"))
 
   /**
    * Subscribes to component instance events. Callback will be invoked on call
@@ -224,15 +233,27 @@ final class ComponentInstance[
     prepare()
     val state = snapshot[CS](nodeId).map(Right(_)).getOrElse(component.initialState)
     val node = state match {
-      case Right(value) => component.render(parameters, value)
+      case Right(value) =>
+        if (lastParameters != parameters) {
+          component.maybeUpdateState(parameters, value) match {
+            case None => ()
+            case Some(effect) =>
+              effect.flatMap { newState =>
+                stateManager.write(nodeId, newState) *>
+                  stateQueue.enqueue(nodeId, newState, None)
+              }.runAsyncForget // TODO Should be cancelable
+          }
+        }
+        component.render(parameters, value)
       case Left(generateState) =>
         generateState(parameters).flatMap { newState =>
           stateManager.write(nodeId, newState) *>
             stateQueue.enqueue(nodeId, newState, None)
-        }.runAsyncForget
+        }.runAsyncForget // TODO Should be cancelable
         component.renderNoState(parameters)
     }
 
+    lastParameters = parameters
     val proxy = createMiscProxy(
       rc,
       (proxy, misc) =>
@@ -270,7 +291,6 @@ final class ComponentInstance[
                   frontend,
                   eventRegistry,
                   stateManager,
-                  getRenderNum,
                   stateQueue,
                   scheduler,
                   reporter,
@@ -318,33 +338,31 @@ final class ComponentInstance[
     pendingEffects.enqueue(effect)
   }
 
-  def applyEvent(eventId: EventId): Boolean =
-    try {
-      events.get(eventId) match {
-        case Some(events: Vector[Event[F, CS, E]]) =>
-          // A user defines the event effect, so we
-          // don't control the time of execution.
-          // We shouldn't block the application if
-          // the user's code waits for something
-          // for a long time.
-          events.forall { event =>
-            event.effect(browserAccess).runAsync {
-              case Left(e) => reporter.error(s"Event handler for ${eventId.`type`} at ${eventId.target} failed", e)
-              case _       => () // Do nothing
-            }
-            !event.stopPropagation
-          }
-        case None =>
-          nestedComponents.values.forall { nested =>
-            nested.applyEvent(eventId)
-          }
+  type EventHandlers    = Vector[DomEventMessage => F[Boolean]]
+  type AllEventHandlers = MapView[EventId, EventHandlers]
+
+  def allEventHandlers: AllEventHandlers =
+    events.view.mapValues { handlers =>
+      handlers.map { handler => (dem: DomEventMessage) =>
+        handler
+          .effect(BrowserAccess(dem))
+          .as(handler.stopPropagation)
       }
-    } catch {
-      case NonFatal(ex) =>
-        recovery(ex).runAsyncForget
-        // Stop event propagation because error happen
-        false
-    }
+    } +++ nestedComponents.values
+      .map(_.allEventHandlers)
+      .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
+
+  def eventHandlersFor(eventId: EventId): EventHandlers =
+    events
+      .get(eventId)
+      .fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
+        handlers.map { handler => (dem: DomEventMessage) =>
+          handler
+            .effect(BrowserAccess(dem))
+            .as(handler.stopPropagation)
+        }
+      } ++ nestedComponents.values
+      .flatMap(_.eventHandlersFor(eventId))
 
   /**
    * Remove all delays and nested component instances which were not marked

@@ -21,7 +21,13 @@ import java.nio.charset.StandardCharsets
 import java.util.zip.{Deflater, Inflater}
 import korolev.Qsid
 import korolev.data.{Bytes, BytesLike}
+import java.nio.{ByteBuffer, CharBuffer}
+import java.nio.charset.StandardCharsets
+import java.util.zip.{Deflater, Inflater}
+import korolev.Qsid
+import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Effect, Queue, Reporter, Stream}
+import korolev.effect.syntax.*
 import korolev.effect.syntax.*
 import korolev.internal.Frontend
 import korolev.server.{HttpResponse, WebSocketResponse}
@@ -46,7 +52,11 @@ private[korolev] final class MessagingService[F[_]: Effect](
    * Poll message from session's ongoing queue.
    */
   def longPollingSubscribe(qsid: Qsid, rh: Head): F[HttpResponse[F]] =
+   * Poll message from session's ongoing queue.
+   */
+  def longPollingSubscribe(qsid: Qsid, rh: Head): F[HttpResponse[F]] =
     for {
+      _        <- sessionsService.createAppIfNeeded(qsid, rh, createTopic(qsid))
       _        <- sessionsService.createAppIfNeeded(qsid, rh, createTopic(qsid))
       maybeApp <- sessionsService.getApp(qsid)
       // See webSocketMessaging()
@@ -60,17 +70,31 @@ private[korolev] final class MessagingService[F[_]: Effect](
                         headers = commonResponseHeaders
                       )
                   }
+                    case None => Effect[F].pure(commonGoneResponse)
+                    case Some(message) =>
+                      HttpResponse(
+                        status = Response.Status.Ok,
+                        message = message,
+                        headers = commonResponseHeaders
+                      )
+                  }
     } yield {
       response
+    }
     }
 
   /**
    * Push message to session's incoming queue.
    */
   def longPollingPublish(qsid: Qsid, data: Stream[F, Bytes]): F[HttpResponse[F]] =
+   * Push message to session's incoming queue.
+   */
+  def longPollingPublish(qsid: Qsid, data: Stream[F, Bytes]): F[HttpResponse[F]] =
     for {
       topic   <- takeTopic(qsid)
+      topic   <- takeTopic(qsid)
       message <- data.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String)
+      _       <- topic.enqueue(message)
       _       <- topic.enqueue(message)
     } yield commonOkResponse
 
@@ -144,6 +168,12 @@ private[korolev] final class MessagingService[F[_]: Effect](
     incomingMessages: Stream[F, Bytes],
     protocols: Seq[String]
   ): F[WebSocketResponse[F]] = {
+  def webSocketMessaging(
+    qsid: Qsid,
+    rh: Head,
+    incomingMessages: Stream[F, Bytes],
+    protocols: Seq[String]
+  ): F[WebSocketResponse[F]] = {
     val (selectedProtocol, decoder, encoder) = {
       // Support for protocol compression. A client can tell us
       // it can decompress the messages.
@@ -180,17 +210,25 @@ private[korolev] final class MessagingService[F[_]: Effect](
    * Sessions created via long polling subscription takes messages from topics
    * stored in this table.
    */
+   * Sessions created via long polling subscription takes messages from topics
+   * stored in this table.
+   */
   private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
 
   /**
    * Same headers in all responses
    */
+   * Same headers in all responses
+   */
   private val commonResponseHeaders = Seq(
     "cache-control" -> "no-cache",
+    "content-type"  -> "application/json"
     "content-type"  -> "application/json"
   )
 
   /**
+   * Same response for all 'publish' requests.
+   */
    * Same response for all 'publish' requests.
    */
   private val commonOkResponse = Response(
@@ -201,6 +239,9 @@ private[korolev] final class MessagingService[F[_]: Effect](
   )
 
   /**
+   * Same response for all 'subscribe' requests where outgoing stream is
+   * consumed.
+   */
    * Same response for all 'subscribe' requests where outgoing stream is
    * consumed.
    */
@@ -234,3 +275,4 @@ private[korolev] object MessagingService {
   def SomeReloadMessageF[F[_]: Effect]: F[Option[String]] =
     Effect[F].pure(Option(Frontend.ReloadMessage))
 }
+
