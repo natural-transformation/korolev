@@ -480,22 +480,6 @@
       url = "https://repo1.maven.org/maven2/com/softwaremill/magnolia1_3/magnolia_3/1.3.0/magnolia_3-1.3.0.pom";
       sha256 = "8545AA0ACC991E9E291ACAA782DF4EE15A5737A2EEC98266200404F1A9826923";
     };
-    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-javadoc.jar";
-      sha256 = "AA7324055199A6A80992E50C5E26B1E2D16D09BDEDA5DFA2479CF0DDA394006D";
-    };
-    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6-sources.jar";
-      sha256 = "6A0D74418A237C48008BC9E7DC20814201E1F7E01583D43243EA4314292938DB";
-    };
-    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.jar" = {
-      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.jar";
-      sha256 = "DD8B5C30C079CCE55A9C9EDA4BFDE41B455A9526B8987BA7853155E0AD40A977";
-    };
-    "nix-public/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.pom" = {
-      url = "https://repo1.maven.org/maven2/com/sourcegraph/semanticdb-javac/0.9.6/semanticdb-javac-0.9.6.pom";
-      sha256 = "74B698BD7B04596436AF1B7E573F29B44C62660B7044005CDA87D0717ECC6D8C";
-    };
     "nix-public/com/sun/activation/all/1.2.2/all-1.2.2.pom" = {
       url = "https://repo1.maven.org/maven2/com/sun/activation/all/1.2.2/all-1.2.2.pom";
       sha256 = "1973D499CC2C1264AFF2D6D052A1C716AE613D018AE1C2F610DD6A4D1C24578E";
