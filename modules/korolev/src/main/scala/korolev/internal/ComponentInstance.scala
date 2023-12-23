@@ -16,7 +16,6 @@
 
 package korolev.internal
 
-import Context.*
 import korolev.*
 import korolev.Context.*
 import korolev.data.Bytes

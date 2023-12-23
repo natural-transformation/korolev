@@ -27,8 +27,6 @@ private[korolev] final class Html5RenderContext[F[_]: Effect, S, M](presetId: Bo
 
   private lazy val idb = IdBuilder()
 
-  private lazy val idb = IdBuilder()
-
   override def addMisc(misc: Binding[F, S, M]): Unit = misc match {
     case ComponentEntry(component, parameters, _) =>
       val rc = this.asInstanceOf[RenderContext[Context.Binding[F, Any, Any]]]

@@ -30,7 +30,6 @@ import scala.concurrent.ExecutionContext
 package object server {
 
   type HttpRequest[F[_]]  = Request[Stream[F, Bytes]]
-  type HttpRequest[F[_]]  = Request[Stream[F, Bytes]]
   type HttpResponse[F[_]] = Response[Stream[F, Bytes]]
 
   final case class WebSocketRequest[F[_]](httpRequest: Request[Stream[F, Bytes]], protocols: Seq[String])

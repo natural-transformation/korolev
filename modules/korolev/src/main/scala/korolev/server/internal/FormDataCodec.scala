@@ -38,9 +38,7 @@ private[korolev] final class FormDataCodec {
     def checkDelimiter(delimiter: String): Boolean = {
       val d = delimiter.getBytes
       @tailrec def aux(pos: Int, startPos: Int): Boolean =
-      @tailrec def aux(pos: Int, startPos: Int): Boolean =
         if (pos < d.length) {
-          if (source.position() == source.limit()) {
           if (source.position() == source.limit()) {
             true
           } else {
