@@ -172,12 +172,10 @@ final class ApplicationInstance
     val k = (dem.target, dem.eventType)
     Effect[F]
       .delay(eventCounters.getOrElse(k, 0)).flatMap { eventCounter => 
-        println(s"processing $dem. eventCounter=$eventCounter, dem.eventCounter=${dem.eventCounter}")
         if (eventCounter == dem.eventCounter) {
           val propagation = calculateEventPropagation(dem.target, dem.eventType)
           val allHandlers = topLevelComponentInstance.allEventHandlers
           val allEffects = propagation.toList.flatMap(eventId => allHandlers.getOrElse(eventId, Vector.empty))
-          println(s"handlers found: ${allEffects}")
           if (allEffects.nonEmpty) {
             for {
               _ <- aux(allEffects)
