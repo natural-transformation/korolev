@@ -88,8 +88,8 @@ val commonSettings = publishSettings ++ Seq(
           "-Xlint",
           "-Ywarn-numeric-widen",
           "-Ywarn-value-discard",
-          "-Xsource:3"
-          //"-P:kind-projector:underscore-placeholders",
+          "-Xsource:3",
+          "-Xmigration" // ZioExample.scala gives error without this option
         )
       case _ =>
         Seq(

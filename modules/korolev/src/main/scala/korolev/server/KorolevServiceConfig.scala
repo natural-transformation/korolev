@@ -54,7 +54,7 @@ case class KorolevServiceConfig[F[_], S, M](
   presetIds: Boolean = false,
   compressionSupport: Option[DeflateCompressionService[F]] =
     None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
-)(using val executionContext: ExecutionContext)
+)(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {
 

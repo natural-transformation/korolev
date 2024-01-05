@@ -41,7 +41,7 @@ package object server {
     config: KorolevServiceConfig[F, S, M]
   ): KorolevService[F] = {
 
-    given exeContext: ExecutionContext = config.executionContext
+    implicit val exeContext: ExecutionContext = config.executionContext
 
     // TODO remove this when render/node fields will be removed
     val actualConfig =
