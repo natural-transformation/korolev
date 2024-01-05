@@ -3,6 +3,7 @@ import korolev.akka.*
 import korolev.server.*
 import korolev.state.javaSerialization.*
 import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
@@ -53,18 +54,18 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                       clazz := {
                         if (!todo.done) "checkbox"
                         else "checkbox checkbox__checked"
-                      },
-                      // Generate transition when clicking checkboxes
-                      event("click") { access =>
-                        access.transition { s =>
-                          val todos   = s.todos(s.selectedTab)
-                          val updated = todos.updated(i, todos(i).copy(done = !todo.done))
-                          s.copy(todos = s.todos + (s.selectedTab -> updated))
-                        }
                       }
                     ),
                     if (!todo.done) span(todo.text)
-                    else span(textDecoration @= "line-through", todo.text)
+                    else span(textDecoration @= "line-through", todo.text),
+                    event("click") { access =>
+                      // Generate transition when clicking checkboxes
+                      access.transition { s =>
+                        val todos   = s.todos(s.selectedTab)
+                        val updated = todos.updated(i, todos(i).copy(done = !todo.done))
+                        s.copy(todos = s.todos + (s.selectedTab -> updated))
+                      }
+                    }
                   )
                 }
               ),
@@ -73,13 +74,9 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
                 event("submit") { access =>
                   access.valueOf(inputId) flatMap { value =>
                     val todo = State.Todo(value, done = false)
-                    Future.successful {
-                      for (_ <- 0 until 3) {
-                        access.transition { s =>
-                          s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
-                        }
-                      }
-                    }.map(_ => ())
+                    access.transition { s =>
+                      s.copy(todos = s.todos + (s.selectedTab -> (s.todos(s.selectedTab) :+ todo)))
+                    }
                   }
                 },
                 input(

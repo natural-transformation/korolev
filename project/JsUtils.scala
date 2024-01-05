@@ -37,7 +37,7 @@ object JsUtils {
       }
       val options = {
         val options = new CompilerOptions()
-        options.setLanguageIn(LanguageMode.ECMASCRIPT_2018)
+        options.setLanguageIn(LanguageMode.ECMASCRIPT_2021)
         options.setLanguageOut(LanguageMode.ECMASCRIPT5_STRICT)
         options.setSourceMapIncludeSourcesContent(true)
         options.setSourceMapLocationMappings(

@@ -11,7 +11,7 @@ From server to the client
 ]
 ```
 
- * 0 - SetRenderNum(n)
+ * 0 - SetRenderNum(id, eventType n)
  * 1 - Reload()
  * 2 - ListenEvent(type, preventDefault)
  * 3 - ExtractProperty(descriptor, id, propertyName)
@@ -22,11 +22,13 @@ From server to the client
  * 8 - ReloadCss()
  * 9 - Keep-alive message from server (noop)
  * 10 - EvalJs(descriptor, code)
- * 11 - ExtractEventData(descriptor, renderNum)
+ * 11 - ExtractEventData(descriptor, id, eventTpye)
  * 12 - ListFiles(id, descriptor)
  * 13 - UploadFile(id, descriptor, fileName)
  * 14 - ResetForm(id)
  * 15 - DownloadFile(name, descriptor)
+ * 16 - Heartbeat response from server
+ * 17 - Reset all event counters
 
 ### Modify dom commands
 
@@ -63,7 +65,7 @@ From the client to the server
 ]
 ```
 
- * 0 - DOM Event. Data: `$renderNum:$elementId:$eventType`
+ * 0 - DOM Event. Data: `$eventCounter:$elementId:$eventType`
  * 1 - Custom callback. Data: `$name:$arg`  
  * 2 - ExtractProperty response. Data:`$descriptor:$type:$value`
  * 3 - History Event. Data: URL

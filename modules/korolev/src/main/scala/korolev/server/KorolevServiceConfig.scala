@@ -21,6 +21,7 @@ import korolev.data.Bytes
 import korolev.effect.{Effect, Reporter}
 import korolev.state.IdGenerator
 import korolev.web.{Path, PathAndQuery}
+import korolev.web.{Path, PathAndQuery}
 import levsha.Document
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration._
@@ -49,9 +50,11 @@ case class KorolevServiceConfig[F[_], S, M](
   recovery: PartialFunction[Throwable, S => S] = PartialFunction.empty[Throwable, S => S],
   sessionIdleTimeout: FiniteDuration = 60.seconds,
   delayedRender: FiniteDuration = 0.seconds,
+  heartbeatLimit: Option[Int] = Some(2),
+  presetIds: Boolean = false,
   compressionSupport: Option[DeflateCompressionService[F]] =
     None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
-)(using val executionContext: ExecutionContext)
+)(implicit val executionContext: ExecutionContext)
 
 object KorolevServiceConfig {
 

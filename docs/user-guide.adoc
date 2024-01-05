@@ -3,7 +3,11 @@
 :numbered:
 :toc:
 
-Aleksey Fomkin <aleksey.fomkin@gmail.com>
+:version: 1.6.0
+:commit: 47197a88cff770ec254aeae5d5c684fb586e8e3a
+:code: https://gitflic.ru/project/fomkin/korolev/blob?commit={commit}&file=
+
+Aleksey Fomkin <a@fomkin.org>
 
 == Introduction
 
@@ -25,7 +29,7 @@ Our project supports static page rendering so that search engines could index pa
 
 You need SBT and JDK 11+ installed. Once installed, run g8 template.
 
-[source,bash]
+[source,console]
 -----------------------------------
 $ sbt new fomkin/korolev.g8
 $ cd mykorolevproject
@@ -260,29 +264,6 @@ Worth to note that application is a component too, so you can consider Korolev's
 
 Components are independent. Every component has its own context. It opens up a way to write reusable code.
 
-There are two ways to define a component: in functional and in object-oriented style. Let's take a look at functional style components.
-
-[source,scala]
------------------------------------
-val MyComponent = Component[Future, ComponentState, ComponentParameters, EventType](initialState) { (context, parameters, state) =>
-
-  import context._
-  import levsha.dsl._
-  import levsha.dsl.html._
-
-  div(
-    parameters.toString,
-    state.toString,
-    event("click") { access =>
-      // Change component state here
-      // using transition as usual.
-    }
-  )
-}
------------------------------------
-
-Same component can be defined in object-oriented style.
-
 [source,scala]
 -----------------------------------
 object MyComponent extends Component[Future, ComponentState, ComponentParameters, EventType](initialState) {
@@ -303,6 +284,34 @@ object MyComponent extends Component[Future, ComponentState, ComponentParameters
 }
 -----------------------------------
 
+As you can observe, the state of the component has a default value. Occasionally, the initial state cannot be set without parameters. In such cases, you can pass a function called `loadState` instead of `initialState`. This function has an effect of `P => F[S]`, where `P` represents the component parameters. This can be highly advantageous.
+
+Imagine a component that displays the user's display name and photo, while the application state (higher than component) only contains the user's ID. The photo's address and display name are stored in a database.
+
+[source,scala]
+-----------------------------------
+class UserCardComponent(userService: UserService) extends Component[Future, Option[User], UserId, Any](loadState = userService.getUser(userId)) {
+
+  ...
+
+  // As `User` doesn't load instantly, we should display a placeholder. By default, it is a simple `div()`.
+  def renderNoState(userId: UserId): Node = {
+    // Just display user ID while state not loaded
+    div(userId.asString)
+  }
+
+  // The parameters of the user's ID can be modified, necessitating a state reload with the updated profile. The function offers an optional effect as a return value. If no reload is necessary, it returns None; otherwise, it returns the effect with the updated state.
+  def maybeUpdateState(userId: UserId, maybeUser: Option[User]): Option[F[Option[User]]] =
+    maybeUser.collect {
+      case user if user.id != userId =>
+        userService.getUser(userId)
+    }
+}
+
+// Inject userService dependency
+val UserCard = new UserCardComponent(userService)
+-----------------------------------
+
 Let's use our component in the application.
 
 [source,scala]
@@ -316,13 +325,13 @@ Html(
         case n => n + 1
       }
     },
-    // If you don't want to handle event, use silent instance
-    MyComponent.silent(parameters)
+    // And if you don't want to handle event
+    MyComponent(parameters)
   )
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/component/src/main/scala/ComponentExample.scala[See full example]
+{code}examples/component/src/main/scala/ComponentExample.scala[See full example]
 
 === Access element properties
 
@@ -381,7 +390,7 @@ form(
 )
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/form-data/src/main/scala/FormDataExample.scala[See full example]
+{code}examples/form-data/src/main/scala/FormDataExample.scala[See full example]
 
 === File streaming
 
@@ -440,7 +449,7 @@ for {
 } yield ()
 -----------------------------------
 
-Note that `downloadFilesAsStream` gives you Korolev streams, which is not suitable to be used in applications. Korolev has built-in converters for popular stream libraries; see <<Streams>>. 
+Note that `downloadFilesAsStream` gives you Korolev streams, which is not suitable to be used in applications. Korolev has built-in converters for popular stream libraries; see <<Streams>>.
 
 ==== Uploading
 
@@ -455,7 +464,7 @@ for {
 } yield ()
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/file-streaming/src/main/scala/FileStreamingExample.scala[See full example]
+{code}examples/file-streaming/src/main/scala/FileStreamingExample.scala[See full example]
 
 === Delays
 
@@ -490,7 +499,7 @@ def render(state: Boolean) =
 }
 -----------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/delay/src/main/scala/DelayExample.scala[See full example]
+{code}examples/delay/src/main/scala/DelayExample.scala[See full example]
 
 === Extensions
 
@@ -533,7 +542,7 @@ KorolevServiceConfig(
 
 Now every session is subscribed to new notifications. Render will be invoked automatically and user will get his page updated.
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/extension/src/main/scala/ExtensionExample.scala[See full example]
+{code}examples/extension/src/main/scala/ExtensionExample.scala[See full example]
 
 === Routing
 
@@ -572,7 +581,7 @@ KorolevServiceConfig(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
+{code}examples/routing/src/main/scala/RoutingExample.scala#L93[See full example]
 
 ==== Using Query parameter extractors
 
@@ -603,7 +612,7 @@ router = Router(
 )
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/routing/src/main/scala/PathAndQueryRoutingExample.scala[See full example]
+{code}examples/routing/src/main/scala/PathAndQueryRoutingExample.scala[See full example]
 
 For easy parameter matching Korolev provide tree way for parameters matching:
 
@@ -657,7 +666,7 @@ path match {
 }
 -------------------------------------------------------------------------------
 
-For more information about Path and Querry matching, please read https://github.com/fomkin/korolev/blob/v1.5.0/modules/web/src/test/scala/korolev/web/PathAndQuerySpec.scala[PathAndQuerySpec]
+For more information about Path and Querry matching, please read {code}modules/web/src/test/scala/korolev/web/PathAndQuerySpec.scala[PathAndQuerySpec]
 
 ==== Running at a nested path
 
@@ -735,7 +744,36 @@ access.transition(lens) { tab2 =>
 
 
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
+{code}examples/context-scope/src/main/scala/ContextScopeExample.scala[See full example]
+
+=== Heartbeat and Reconnection
+
+By default, the Korolev client-side sends a heartbeat every `5` seconds and tracks how many heartbeats are lost. After two consecutive lost heartbeats, the client performs a forced reconnection to the server. The heartbeat interval can be controlled with `KorolevServiceConfig.heartbeatInterval`. Additionally, you can disable bidirectional heartbeat by setting `KorolevServiceConfig.heartbeatLimit = None`. As a result, the client-side will send messages to the server, but the server will not respond.
+
+=== Emitting Korolev IDs
+
+In some cases, you may want to add analytics scripts or other third-party JavaScript to your page that modifies the DOM by adding elements to certain places. Sometimes this can lead to parts of your application ceasing to function. To address this issue, you can set `KorolevServiceConfig.presetIds=true`. As a result, all nodes managed by Korolev will receive an additional attribute `k="6", and Korolev will use these IDs to manage the DOM, ignoring any nodes added via third-party JavaScript.
+
+=== Delayed render
+
+In certain scenarios, multiple transitions can occur within a single event handler. If the page is resource-intensive or includes a stateful component with delayed state loading, it can result in decreased performance. However, Korolev has the capability to bundle these transitions together, thereby optimizing rendering.
+
+[source,scala]
+------------------------------
+import scala.concurrent.duration.*
+
+val config = KorolevServiceConfig(
+  ...
+  delayedRender = 2.millis
+)
+------------------------------
+
+The render function will now be called only 2 milliseconds after the initial transition.
+
+[NOTE]
+============
+In this case `transitionForce` will wait until delayed render be performed.
+============
 
 == Testing Korolev applications
 
@@ -745,9 +783,9 @@ Use Korolev Test Kit to simulate environment for event listeners and extensions.
 
 Add Test Kit dependency to your project. You can use use Test Kit with any suitable testing library which supports asynchronous testing.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-testkit" % "1.5.0" % Test
+libraryDependencies += "org.fomkin" %% "korolev-testkit" % "{version}" % Test
 ------------------------------
 
 Let's imagine that you are creating application which can to add two integer numbers and to show the result. The app has two text fields and a `span` tag to show the result. The view state of the app is `Option[Int]`. When one of the fields changes, the app reads values of inputs, adds them, and shows calculated result.
@@ -823,7 +861,7 @@ it should "be handled" in {
 }
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/zio/src/test/scala/ZioExampleSpec.scala[See full example]
+{code}examples/zio/src/test/scala/ZioExampleSpec.scala[See full example]
 
 === Selenium
 
@@ -840,7 +878,7 @@ If you need to extend your application with something that you can't implement w
 Korolev doesn't have any specific code to support WebComponents. WebComponent (Custom Elements + Shadow DOM) by design should behave as regular HTML tags. There is no difference between, for example, input or textarea, and any custom element.
 ============
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
+{code}examples/web-component/src/main/scala/WebComponentExample.scala[See full example]
 
 === Call JavaScript from server
 
@@ -890,7 +928,7 @@ div(myElement)
 access.evalJs(js"""$myElement.innerHTML = 'this is <a href="http://example.com">example</a>'""")
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
+{code}examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 === Call server from JavaScript
 
@@ -910,7 +948,7 @@ Now invoke it from the client side.
 Korolev.invokeCallback('myCallback', 'myArgValue');
 -------------------------------------------------------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
+{code}examples/evalJs/src/main/scala/EvalJsExample.scala[See full example]
 
 == Productivity
 
@@ -949,9 +987,9 @@ By default Korolev log all messages to standard output. You can redirect logs to
 
 Add the dependency.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-slf4j" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-slf4j" % "{version}"
 ------------------------------
 
 Configure reporter.
@@ -968,9 +1006,9 @@ val config = KorolevServiceConfig(
 
 Korolev provides smooth Akka HTTP integration out of the box. To use it, add a dependency:
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-akka" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-akka" % "{version}"
 ------------------------------
 
 [source,scala]
@@ -994,11 +1032,48 @@ val korolevRoute = akkaHttpService(config).apply(AkkaHttpServerConfig())
 
 Then embed the route into your Akka HTTP routes structure.
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
+{code}examples/akka-http/src/main/scala/AkkaHttpExample.scala[See full example]
 
 This integration overrides default logging behavior to `akka.event.Logging`.
 
 Despite the fact that Akka uses standard Scala futures, the module can
+work we any effect type supported by Korolev
+
+=== Pekko HTTP
+
+Korolev provides smooth Pekko HTTP integration out of the box. To use it, add a dependency:
+
+[source,scala,subs="attributes"]
+------------------------------
+libraryDependencies += "org.fomkin" %% "korolev-pekko" % "{version}"
+------------------------------
+
+[source,scala]
+------------------------------
+val service = KorolevServiceConfig[...](
+  ...
+))
+------------------------------
+
+And create Korolev route:
+
+[source,scala]
+------------------------------
+val config = KorolevServiceConfig[Future, String, Any](
+  stateLoader = StateLoader.default("world"),
+  document = state => Html(body(div(s"Hello $state")))
+)
+
+val korolevRoute = akkaHttpService(config).apply(PekkoHttpServerConfig())
+------------------------------
+
+Then embed the route into your Akka HTTP routes structure.
+
+{code}examples/pekko-http/src/main/scala/PekkoHttpExample.scala[See full example]
+
+This integration overrides default logging behavior to `org.apache.pekko.event.Logging`.
+
+Despite the fact that Pekko uses standard Scala futures, the module can
 work we any effect type supported by Korolev
 
 === Zio-Http
@@ -1007,9 +1082,9 @@ Korolev provides smooth Zio-Http integration out of the box.
 
 To use it, add a dependency:
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio-http" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio-http" % "{version}"
 ------------------------------
 
 And create Korolev service:
@@ -1048,7 +1123,7 @@ val prog = for {
 
 ----------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/zio-http/src/main/scala/ZioHttpExample.scala[See full example]
+{code}examples/zio-http/src/main/scala/ZioHttpExample.scala[See full example]
 
 === Effects
 
@@ -1058,16 +1133,16 @@ In addition to standard Scala Futures, Korolev can work with popular effects lib
 
 Add dependency for ZIO interop.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio" % "{version}"
 ------------------------------
 
 Or ZIO 2
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio2" % "{version}"
 ------------------------------
 
 Initialize your app with ZIO.
@@ -1084,15 +1159,15 @@ val config = KorolevServiceConfig[zio.Task, MyState, Any](...)
 
 Korolev uses `Throwable` inside itself. That means if you want to work with your own, you should provide functions to convert `Throwable` to [[E]] and vice versa.
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/zio/src/main/scala/ZioExample.scala[See full example]
+{code}examples/zio/src/main/scala/ZioExample.scala[See full example]
 
 ==== Monix
 
 Add Monix interop dependency.
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-monix" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-monix" % "{version}"
 ------------------------------
 
 Initialise your app with Monix. Ensure you have implicit `monix.execution.Scheduler` in the scope.
@@ -1105,22 +1180,22 @@ val ctx = Context[monix.eval.Task, MyState, Any]
 val config = KorolevServiceConfig[monix.eval.Task, MyState, Any](...)
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/monix/src/main/scala/MonixExample.scala[See full example]
+{code}examples/monix/src/main/scala/MonixExample.scala[See full example]
 
 ==== Cats Effect
 
 Add Cats dependency. If you use Cats Effect 2
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-ce2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-ce2" % "{version}"
 ------------------------------
 
 Or is you use Cats Effect 3
 
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-ce3" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-ce3" % "{version}"
 ------------------------------
 
 Initialise your app with IO.
@@ -1133,7 +1208,7 @@ val ctx = Context[IO, MyState, Any]
 val config = KorolevServiceConfig[IO, MyState, Any](...)
 ------------------------------
 
-https://github.com/fomkin/korolev/blob/v1.5.0/examples/cats/src/main/scala/CatsIOExample.scala[See full example]
+{code}examples/cats/src/main/scala/CatsIOExample.scala[See full example]
 
 === Streams
 
@@ -1190,9 +1265,9 @@ myFlow.to(korolevSink)
 ==== ZIO
 
 To use it, add a dependency:
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
-libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-zio-streams" % "{version}"
 ------------------------------
 
 Conversion from Korolev to ZIO:
@@ -1226,12 +1301,12 @@ val io = ZStream.fromIterable(values)
 Conversion from Korolev to Fs2:
 
 To use it, add a dependency.
-[source,scala]
+[source,scala,subs="attributes"]
 ------------------------------
 // For Fs2-2.* and Cats Effect 2:
-libraryDependencies += "org.fomkin" %% "korolev-fs2-ce2" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce2" % "{version}"
 // For Fs2-3.* and Cats Effect 3:
-libraryDependencies += "org.fomkin" %% "korolev-fs2-ce3" % "1.5.0"
+libraryDependencies += "org.fomkin" %% "korolev-fs2-ce3" % "{version}"
 ------------------------------
 
 Conversion from Korolev to Fs2.
@@ -1275,7 +1350,7 @@ Now you can see something like this.
 ------------------------------
 
 Message starting with `->` is commands from server. Message started with `<-` is callback and client side events.
-First number is always an procedure or callback code. You can protocol description https://github.com/fomkin/korolev/blob/v1.5.0/modules/korolev/src/main/protocol.md[here].
+First number is always an procedure or callback code. You can protocol description {code}modules/korolev/src/main/protocol.md[here].
 
 === Reconnections under Kubernetes Ingress
 

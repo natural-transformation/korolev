@@ -62,6 +62,8 @@ case class Browser(
    *
    * @example
    * {{{
+   * @example
+   *   {{{
    *
    * def onClick(access: Access) = ???
    *
@@ -69,8 +71,7 @@ case class Browser(
    * := "my-button", "Click me" ) )
    *
    * val actions = Browser.event( state = myInitialState, dom = dom, event =
-   * "click" target = _.byName("by-button").headOption, )
-   * }}}
+   * "click" target = _.byName("by-button").headOption, ) }}}
    * @see
    *   [[access]]
    */

@@ -21,6 +21,7 @@ import korolev.data.Bytes
 import korolev.effect.{Effect, Stream}
 import korolev.server.internal.{FormDataCodec, KorolevServiceImpl}
 import korolev.server.internal.services._
+import korolev.server.internal.services._
 import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
 import korolev.web.{Request, Response}
 import korolev.web.Request.Head
@@ -40,7 +41,7 @@ package object server {
     config: KorolevServiceConfig[F, S, M]
   ): KorolevService[F] = {
 
-    given exeContext: ExecutionContext = config.executionContext
+    implicit val exeContext: ExecutionContext = config.executionContext
 
     // TODO remove this when render/node fields will be removed
     val actualConfig =
