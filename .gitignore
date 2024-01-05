@@ -1,7 +1,3 @@
-## Akka
-interop/pekko
-examples/pekko*
-
 .DS_Store
 .idea*
 target/
