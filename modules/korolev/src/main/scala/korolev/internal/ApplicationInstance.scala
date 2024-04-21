@@ -174,11 +174,10 @@ final class ApplicationInstance
       .delay(eventCounters.getOrElse(k, 0)).flatMap { eventCounter => 
         if (eventCounter == dem.eventCounter) {
           val propagation = calculateEventPropagation(dem.target, dem.eventType)
-          val allHandlers = topLevelComponentInstance.allEventHandlers
-          val allEffects = propagation.toList.flatMap(eventId => allHandlers.getOrElse(eventId, Vector.empty))
+          val allEffects = topLevelComponentInstance.eventHandlersFor(propagation.toVector)
           if (allEffects.nonEmpty) {
             for {
-              _ <- aux(allEffects)
+              _ <- aux(allEffects.toList)
               newEventConter = dem.eventCounter + 1
               _ <- Effect[F].delay(eventCounters.put(k, newEventConter))
               _ <- frontend.setEventCounter(dem.target, dem.eventType, newEventConter)
