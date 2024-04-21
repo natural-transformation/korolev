@@ -352,6 +352,7 @@ abstract class Stream[F[_]: Effect, A] { self =>
 
     self
       .foreach(queue.enqueue)
+      .flatMap(_ => cancel())
       .start
       .runAsyncForget
 
