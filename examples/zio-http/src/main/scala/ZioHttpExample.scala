@@ -6,10 +6,9 @@ import korolev.web.PathAndQuery
 import korolev.zio.Zio2Effect
 import korolev.state.javaSerialization.*
 import korolev.zio.http.ZioHttpKorolev
-import zio.http.HttpApp
 import zio.http.Response
+import zio.http.Routes
 import zio.http.Server
-import zio.http.Status
 
 import scala.concurrent.ExecutionContext
 
@@ -71,13 +70,13 @@ object ZioHttpExample extends ZIOAppDefault {
       }
     )
 
-    def route(): HttpApp[Any, Throwable] = {
+    def route(): Routes[Any, Throwable] = {
       new ZioHttpKorolev[Any].service(config)
     }
 
   }
 
-  private def getAppRoute(): ZIO[Any, Nothing, HttpApp[Any, Throwable]] = {
+  private def getAppRoute(): ZIO[Any, Nothing, Routes[Any, Throwable]] = {
     ZIO.runtime[Any].map { implicit rts =>
       new Service().route()
     }
@@ -88,7 +87,7 @@ object ZioHttpExample extends ZIOAppDefault {
     for {
       httpApp <- getAppRoute()
       _ <- Server
-        .serve(httpApp.catchAllZIO(_ => ZIO.succeed(Response.status(Status.InternalServerError))))
+        .serve(httpApp.handleError(_ => Response.badRequest))
         .provide(Server.defaultWithPort(8088))
         .orDie
     } yield ZExitCode.success

@@ -9,8 +9,8 @@ val levshaVersion = "1.3.0"
 val akkaVersion = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
-val pekkoVersion = "1.0.0"
-val pekkoHttpVersion = "1.0.0"
+val pekkoVersion = "1.0.1"
+val pekkoHttpVersion = "1.0.1"
 
 val circeVersion = "0.14.1"
 val ce2Version = "2.5.5"
@@ -18,7 +18,7 @@ val ce3Version = "3.3.12"
 
 val zioVersion = "1.0.15"
 val zio2Version = "2.0.0"
-val zioHttpVersion = "3.0.0-RC2"
+val zioHttpVersion = "3.0.0-RC9"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
