@@ -26,7 +26,7 @@ val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
 
-val VERSION = "1.17.0-SNAPSHOT"
+val VERSION = "1.17.1"
 
 version := VERSION
 
@@ -35,6 +35,12 @@ val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/
 val crossVersionSettings = Seq(
   crossScalaVersions := Seq(scala2_13Version, scala3Version)
 )
+
+credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
+
+sonatypeCredentialHost := "s01.oss.sonatype.org"
+sonatypeProfileName    := "com.natural-transformation"
+publishTo              := sonatypePublishToBundle.value
 
 val dontPublishSettings = Seq(
   publish         := {},
@@ -47,16 +53,18 @@ val publishSettings = Seq(
   publishMavenStyle      := true,
   Test / publishArtifact := false,
   pomIncludeRepository   := { _ => false },
-  publishTo              := sonatypePublishTo.value,
-  sonatypeProfileName    := "org.fomkin",
-  sonatypeProjectHosting := Some(GitHubHosting("fomkin", "korolev", "Aleksey Fomkin", "aleksey.fomkin@gmail.com")),
-  headerLicense          := Some(HeaderLicense.ALv2("2017-2020", "Aleksey Fomkin")),
-  licenses               := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+  publishTo              := sonatypePublishToBundle.value,
+  sonatypeCredentialHost := "s01.oss.sonatype.org",
+  // sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
+  sonatypeProfileName    := "com.natural-transformation",
+  sonatypeProjectHosting := Some(GitHubHosting("natural-transformation", "korolev", "zli@natural-transformation.com")),
+  headerLicense := Some(HeaderLicense.ALv2("2024", "Natural Transformation BV")),
+  licenses      := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
 )
 
 val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
-  organization       := "org.fomkin",
+  organization       := "com.natural-transformation",
   scalaVersion       := scala3Version,
   version            := VERSION,
   scalafmtOnCompile  := false,
@@ -226,7 +234,7 @@ lazy val akka = project
   )
   .dependsOn(korolev)
 
-  lazy val pekko = project
+lazy val pekko = project
   .in(interop / "pekko")
   .enablePlugins(GitVersioning)
   .settings(crossVersionSettings)
@@ -463,7 +471,7 @@ lazy val akkaHttpExample = project
   .settings(mainClass := Some("AkkaHttpExample"))
   .dependsOn(akka)
 
-  lazy val pekkoHttpExample = project
+lazy val pekkoHttpExample = project
   .in(examples / "pekko-http")
   .disablePlugins(HeaderPlugin)
   .settings(crossVersionSettings)

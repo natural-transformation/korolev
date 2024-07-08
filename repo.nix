@@ -2,7 +2,7 @@
 {
   "versioning" = [{
       "scalaVersion" = "3.3.1";
-      "sbtVersion" = "1.9.6";
+      "sbtVersion" = "1.10.0";
     }];
   "repos" = {
     "nix-public" = "";
