@@ -152,7 +152,13 @@ class Queue[F[_]: Effect, T](maxSize: Int) {
   def dequeueAll(): F[Seq[T]] = Effect[F].delay {
     def aux(): Seq[T] = {
       val s = state.get()
-      if (state.compareAndSet(s, s.copy(queue = IQueue.empty))) {
+      val (canOfferCallback, restCallback) = s.canOfferCallbacks.splitAt(s.queue.size)
+      val newValue = s.copy(
+        queue = IQueue.empty,
+        canOfferCallbacks = restCallback
+      )
+      if (state.compareAndSet(s, newValue)) {
+        canOfferCallback.foreach(_(unitToken))
         s.queue
       } else {
         aux()

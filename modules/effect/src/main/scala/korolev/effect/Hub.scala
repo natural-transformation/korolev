@@ -45,18 +45,20 @@ final class Hub[F[_]: Effect, T](upstream: Stream[F, T], bufferSize: Int) {
 
     private def pullUpstream(): F[Option[T]] = upstream
       .pull()
-      .map { maybeItem =>
+      .flatMap { maybeItem =>
         maybeItem match {
           case Some(item) =>
-            queues.keysIterator.foreach { queue =>
-              if (queue != thisQueue)
-                queue.offerUnsafe(item)
-            }
+            Effect[F].sequence {
+              queues.keysIterator.map { queue => 
+                if (queue != thisQueue) queue.enqueue(item)
+                else Effect[F].unit
+              }.toList
+            }.as(maybeItem)
           case None =>
             closed = true
             queues.keysIterator.foreach(_.unsafeClose())
+            Effect[F].delay(maybeItem)
         }
-        maybeItem
       }
 
     def pull(): F[Option[T]] =

@@ -337,19 +337,7 @@ final class ComponentInstance[
     pendingEffects.enqueue(effect)
   }
 
-  type EventHandlers    = Vector[DomEventMessage => F[Boolean]]
-  type AllEventHandlers = MapView[EventId, EventHandlers]
-
-  def allEventHandlers: AllEventHandlers =
-    events.view.mapValues { handlers =>
-      handlers.map { handler => (dem: DomEventMessage) =>
-        handler
-          .effect(BrowserAccess(dem))
-          .as(handler.stopPropagation)
-      }
-    } +++ nestedComponents.values
-      .map(_.allEventHandlers)
-      .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
+  type EventHandlers =  Vector[DomEventMessage => F[Boolean]]
 
   def eventHandlersFor(eventId: EventId): EventHandlers =
     events
@@ -362,6 +350,17 @@ final class ComponentInstance[
         }
       } ++ nestedComponents.values
       .flatMap(_.eventHandlersFor(eventId))
+
+  def eventHandlersFor(eventIds: Vector[EventId]): EventHandlers =
+    miscLock.synchronized {
+      eventIds
+        .flatMap(eventId => events.getOrElse(eventId, Vector.empty))
+        .map { handler => (dem: DomEventMessage) =>
+          handler
+            .effect(BrowserAccess(dem))
+            .as(handler.stopPropagation)
+        } ++ nestedComponents.values.flatMap(_.eventHandlersFor(eventIds))
+    }
 
   /**
    * Remove all delays and nested component instances which were not marked

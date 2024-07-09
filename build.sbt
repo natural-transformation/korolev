@@ -1,4 +1,5 @@
 import xerial.sbt.Sonatype._
+import xerial.sbt.Sonatype.autoImport._
 
 val scala2_13Version = "2.13.12"
 val scala3Version    = "3.3.1"
@@ -8,8 +9,8 @@ val levshaVersion = "1.3.0"
 val akkaVersion     = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
-val pekkoVersion     = "1.0.0"
-val pekkoHttpVersion = "1.0.0"
+val pekkoVersion     = "1.0.1"
+val pekkoHttpVersion = "1.0.1"
 
 val circeVersion = "0.14.1"
 val ce2Version   = "2.5.5"
@@ -17,7 +18,7 @@ val ce3Version   = "3.3.12"
 
 val zioVersion     = "1.0.15"
 val zio2Version    = "2.0.0"
-val zioHttpVersion = "3.0.0-RC2"
+val zioHttpVersion = "3.0.0-RC9"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
@@ -26,7 +27,7 @@ val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
 
-val VERSION = "1.17.1"
+val VERSION = "1.17.2" // "1.18.0-SNAPSHOT"
 
 version := VERSION
 
@@ -40,7 +41,6 @@ credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
 
 sonatypeCredentialHost := "s01.oss.sonatype.org"
 sonatypeProfileName    := "com.natural-transformation"
-publishTo              := sonatypePublishToBundle.value
 
 val dontPublishSettings = Seq(
   publish         := {},
@@ -55,11 +55,26 @@ val publishSettings = Seq(
   pomIncludeRepository   := { _ => false },
   publishTo              := sonatypePublishToBundle.value,
   sonatypeCredentialHost := "s01.oss.sonatype.org",
-  // sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
+  sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
   sonatypeProfileName    := "com.natural-transformation",
   sonatypeProjectHosting := Some(GitHubHosting("natural-transformation", "korolev", "zli@natural-transformation.com")),
-  headerLicense := Some(HeaderLicense.ALv2("2024", "Natural Transformation BV")),
-  licenses      := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt"))
+  headerLicense          := Some(HeaderLicense.ALv2("2024", "Natural Transformation BV")),
+  licenses               := Seq("Apache-2.0" -> url("http://www.apache.org/licenses/LICENSE-2.0.txt")),
+  homepage               := Some(url("https://github.com/natural-transformation/korolev")),
+  scmInfo := Some(
+    ScmInfo(
+      url("https://github.com/natural-transformation/korolev"),
+      "scm:git:git@github.com:natural-transformation/korolev.git"
+    )
+  ),
+  developers := List(
+    Developer(
+      id = "natural-transformation",
+      name = "Natural Transformation BV",
+      email = "zli@natural-transformation.com",
+      url = url("https://natural-transformation.com")
+    )
+  )
 )
 
 val commonSettings = publishSettings ++ Seq(

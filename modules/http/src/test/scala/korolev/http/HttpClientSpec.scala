@@ -38,7 +38,7 @@ class HttpClientSpec extends AsyncFreeSpec {
       }
     }
 
-    "should properly send GET requests over TLS" in {
+    "should properly send GET requests over TLS" ignore {
       for {
         client             <- HttpClient.create[Future, Array[Byte]]()
         response           <- client(Method.Get, URI.create("https://fomkin.org/hello.txt"), Seq.empty, None, Stream.empty)
