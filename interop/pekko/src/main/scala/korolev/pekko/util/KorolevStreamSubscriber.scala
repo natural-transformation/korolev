@@ -65,6 +65,11 @@ final class KorolevStreamSubscriber[F[_]: Effect, T] extends Stream[F, T] with S
     }
   }
 
-  def cancel(): F[Unit] =
-    Effect[F].delay(subscription.cancel())
+  def cancel(): F[Unit] = {
+    if (subscription != null) {
+      Effect[F].delay(subscription.cancel())
+    } else {
+      Effect[F].unit
+    }
+  }
 }

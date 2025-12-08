@@ -142,7 +142,16 @@ final class ComponentInstance[
     def state: F[CS] = {
       val state = stateManager.read[CS](nodeId)
 
-      state.map(_.getOrElse(throw new RuntimeException("State is empty")))
+      state.map { maybeState =>
+        maybeState
+          // Fallback to initial state in case when
+          // access.state invoked in component with
+          // unmodified default state.
+          // Required because state manager doesn't
+          // hold the state until modification.
+          .orElse(component.initialState.toOption)
+          .getOrElse(throw new RuntimeException(s"State for ${nodeId.mkString} is empty"))
+      }
     }
 
     def sessionId: F[Qsid] = Effect[F].delay(self.sessionId)

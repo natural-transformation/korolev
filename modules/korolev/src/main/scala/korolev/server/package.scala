@@ -19,18 +19,64 @@ package korolev
 import korolev.Context.Binding
 import korolev.data.Bytes
 import korolev.effect.{Effect, Stream}
+import korolev.effect.syntax.*
 import korolev.server.internal.{FormDataCodec, KorolevServiceImpl}
-import korolev.server.internal.services._
-import korolev.server.internal.services._
+import korolev.server.internal.services.*
 import korolev.state.{DeviceId, StateDeserializer, StateSerializer}
-import korolev.web.{Request, Response}
+import korolev.web.{Headers, MimeTypes, Request, Response}
 import korolev.web.Request.Head
 import scala.concurrent.ExecutionContext
+import java.nio.charset.StandardCharsets
 
 package object server {
 
   type HttpRequest[F[_]]  = Request[Stream[F, Bytes]]
   type HttpResponse[F[_]] = Response[Stream[F, Bytes]]
+
+  object HttpResponse {
+
+    final val defaultHeaders = Seq(Headers.ContentType -> MimeTypes.`text/plain`)
+
+    def apply[F[_]: Effect](status: Response.Status, headers: Seq[(String, String)]): F[HttpResponse[F]] = {
+      Effect[F].pure(
+        Response(
+          status = status,
+          body = Stream.empty,
+          headers = headers,
+          contentLength = None
+        )
+      )
+    }
+
+    def apply[F[_]: Effect](status: Response.Status, bodyBytes: Array[Byte], headers: Seq[(String, String)]): F[HttpResponse[F]] = {
+      Stream(Bytes.wrap(bodyBytes))
+        .mat[F]()
+        .map { stream =>
+          Response(
+            status = status,
+            body = stream,
+            headers = headers,
+            contentLength = Some(bodyBytes.length.toLong)
+          )
+        }
+    }
+
+    def apply[F[_]: Effect](status: Response.Status, text: String, headers: Seq[(String, String)] = defaultHeaders): F[HttpResponse[F]] = {
+      val bodyBytes = text.getBytes(StandardCharsets.UTF_8)
+      apply(status, bodyBytes, headers)
+    }
+
+    def ok[F[_]: Effect](text: String, headers: Seq[(String, String)] = defaultHeaders): F[HttpResponse[F]] = {
+      apply(Response.Status.Ok,  text, headers)
+    }
+
+    def badRequest[F[_]: Effect](text: String, headers: Seq[(String, String)] = defaultHeaders): F[HttpResponse[F]] = {
+      apply(Response.Status.BadRequest, text, headers)
+    }
+
+    def seeOther[F[_]: Effect](location: String): F[HttpResponse[F]] =
+      apply(Response.Status.SeeOther, headers = Seq(Headers.Location -> location))
+  }
 
   final case class WebSocketRequest[F[_]](httpRequest: Request[Stream[F, Bytes]], protocols: Seq[String])
   final case class WebSocketResponse[F[_]](httpResponse: Response[Stream[F, Bytes]], selectedProtocol: String)

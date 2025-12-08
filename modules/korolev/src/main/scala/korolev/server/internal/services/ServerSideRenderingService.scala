@@ -19,7 +19,7 @@ package korolev.server.internal.services
 import korolev.effect.Effect
 import korolev.effect.syntax._
 import korolev.server.{HttpRequest, HttpResponse, KorolevServiceConfig}
-import korolev.server.internal.{Cookies, Html5RenderContext, HttpResponse}
+import korolev.server.internal.{Cookies, Html5RenderContext}
 import korolev.web.{Headers, PathAndQuery}
 import korolev.web.Response.Status
 

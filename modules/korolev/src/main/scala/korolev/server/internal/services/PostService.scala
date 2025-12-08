@@ -22,7 +22,7 @@ import korolev.effect.{Effect, Reporter, Stream}
 import korolev.effect.syntax._
 import korolev.internal.Frontend.DownloadFileMeta
 import korolev.server.HttpResponse
-import korolev.server.internal.{FormDataCodec, HttpResponse}
+import korolev.server.internal.FormDataCodec
 import korolev.web.{Headers, Response}
 import scala.concurrent.ExecutionContext
 

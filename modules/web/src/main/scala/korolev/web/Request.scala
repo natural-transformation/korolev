@@ -82,6 +82,12 @@ final case class Request[Body](
 
 object Request {
 
+  def unapply[Body](method: Request.Method, req: Request[Body]): Option[(Request.Method, PathAndQuery)] =
+    Some((req.method, req.pq))
+
+  def unapply[Body](req: Request[Body]): Option[PathAndQuery] =
+    Some(req.pq)
+
   sealed trait Head {
 
     def method: Method

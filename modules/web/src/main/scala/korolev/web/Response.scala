@@ -44,6 +44,8 @@ object Response {
     val NotFound: Status            = new Status(404, "Not Found")
     val BadRequest: Status          = new Status(400, "Bad Request")
     val Gone: Status                = new Status(410, "Gone")
+    val MovedPermanently: Status    = new Status(301, "Moved Permanently")
+    val SeeOther: Status            = new Status(303, "See Other")
     val SwitchingProtocols: Status  = new Status(101, "Switching Protocols")
     val InternalServerError: Status = new Status(500, "Internal Server Error")
 
