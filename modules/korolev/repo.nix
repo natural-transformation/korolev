@@ -201,37 +201,37 @@
       url = "https://repo1.maven.org/maven2/com/google/protobuf/protobuf-parent/3.7.0/protobuf-parent-3.7.0.pom";
       sha256 = "912A56FF543E6990CC908E75B3E14EBC675E57D2A558D23C3F068001F2E5702C";
     };
-    "nix-public/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1-javadoc.jar";
+    "nix-public/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2-javadoc.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2-javadoc.jar";
       sha256 = "8555B2FBA63F201DDCAA7F89F94FE1689AA2F367764CC15BE24A6D0524158829";
     };
-    "nix-public/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1-sources.jar";
-      sha256 = "D2B3CBA4146BCBDE2FE7F2127DB288869B93A6F14EAC3A868A8A5CEBE451D877";
+    "nix-public/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2-sources.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2-sources.jar";
+      sha256 = "7AD15B12C69E321CAF28D8836A63B6A26D61AD5A74A94AEF5F7DFE6CD22B6B03";
     };
-    "nix-public/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1.jar";
-      sha256 = "B50DF8EFD34E37460DE1931FB7C03DE874CBB8D66C949E7CEF7CDE9AFFC8AE45";
+    "nix-public/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2.jar";
+      sha256 = "5C3FB7743D347E8B6B6DF36E4158E74D96C612CEF53EEF3D16AADA6DDD134DAF";
     };
-    "nix-public/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1.pom" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.1/levsha-core_3-1.6.1.pom";
-      sha256 = "20AE3852B28FE77148A2EB862B5FD3A9A06CC60B576EC209E47694F611F66DBC";
+    "nix-public/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2.pom" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-core_3/1.6.2/levsha-core_3-1.6.2.pom";
+      sha256 = "E54B9E0F928D7324869A3A80762344958026A13F64686E4C687A9F6E8AEF7367";
     };
-    "nix-public/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1-javadoc.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1-javadoc.jar";
+    "nix-public/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2-javadoc.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2-javadoc.jar";
       sha256 = "FBA6CEF8A3577CC2697B972F98C32B641856879C1368A0DB1B885C320F7F9E23";
     };
-    "nix-public/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1-sources.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1-sources.jar";
-      sha256 = "863BE4C1FFF198DA6D960A5DEBBEECD483BA796F2D321C11D4A68AC7D4A21809";
+    "nix-public/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2-sources.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2-sources.jar";
+      sha256 = "0167FD0F7B8BD3867B57D8D683C9574A1B7E852D6696181FABD8628C4EE07983";
     };
-    "nix-public/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1.jar" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1.jar";
-      sha256 = "8EA4AE51A7D2BCD3397FA3FA9CA8BA35E2B574031FFD3469A21CBB4B4DD03660";
+    "nix-public/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2.jar" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2.jar";
+      sha256 = "721B98422AA197AF447F04AD554C0BE9320C5D3D49CF9F4F907FBD17AA27C349";
     };
-    "nix-public/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1.pom" = {
-      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.1/levsha-events_3-1.6.1.pom";
-      sha256 = "93B492B2769BF3F75D786B11CF291557A54B4D0CF4728D869528B43C95FC95CF";
+    "nix-public/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2.pom" = {
+      url = "https://repo1.maven.org/maven2/com/natural-transformation/levsha-events_3/1.6.2/levsha-events_3-1.6.2.pom";
+      sha256 = "14CB62C90CE4E7B8A3EC4EF28CB37D955DB6F5FBD97CCE218DE56F0514F49DE5";
     };
     "nix-public/com/vladsch/flexmark/flexmark-ext-anchorlink/0.62.2/flexmark-ext-anchorlink-0.62.2-javadoc.jar" = {
       url = "https://repo1.maven.org/maven2/com/vladsch/flexmark/flexmark-ext-anchorlink/0.62.2/flexmark-ext-anchorlink-0.62.2-javadoc.jar";
