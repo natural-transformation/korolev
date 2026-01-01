@@ -313,6 +313,10 @@ final class ComponentInstance[
         }
     )
     node(proxy)
+
+    // Publish a complete snapshot of handlers after rendering is finished.
+    // (Events arriving during rendering will still use the previous snapshot.)
+    refreshHandlerSnapshot()
   }
 
   private def applyTransitionEffect(transition: TransitionAsync[F, CS]): F[CS] =
@@ -349,27 +353,50 @@ final class ComponentInstance[
   type EventHandlers    = Vector[DomEventMessage => F[Boolean]]
   type AllEventHandlers = MapView[EventId, EventHandlers]
 
-  def allEventHandlers: AllEventHandlers =
-    events.view.mapValues { handlers =>
-      handlers.map { handler => (dem: DomEventMessage) =>
-        handler
-          .effect(BrowserAccess(dem))
-          .as(handler.stopPropagation)
-      }
-    } +++ nestedComponents.values
+  // NOTE:
+  // `applyRenderContext()` clears and rebuilds `events` under `miscLock`.
+  // Dom events can arrive concurrently while rendering is in progress.
+  //
+  // If we read `events` without synchronization, we can observe an empty / partially
+  // rebuilt registry and incorrectly drop events (this started surfacing after the
+  // Levsha upgrade, because rendering + diff got a bit stricter about buffer lifecycles).
+  //
+  // We fix this by snapshotting the handler registry at the end of rendering (under `miscLock`)
+  // and serving events from the last complete snapshot.
+  //
+  // This avoids observing a partially rebuilt registry *and* avoids allocating a new snapshot per event.
+  private type HandlerSnapshot =
+    (Map[EventId, Vector[Event[F, CS, E]]], List[ComponentInstance[F, CS, E, _, _, _]])
+
+  @volatile private var handlerSnapshot: HandlerSnapshot = (Map.empty, Nil)
+
+  private def refreshHandlerSnapshot(): Unit =
+    // Must be invoked under `miscLock` so `events` and `nestedComponents` are consistent.
+    handlerSnapshot = (events.toMap, nestedComponents.values.toList)
+
+  private def eventHandlersSnapshot: HandlerSnapshot =
+    handlerSnapshot
+
+  private def mapHandlers(handlers: Vector[Event[F, CS, E]]): EventHandlers =
+    handlers.map { handler => (dem: DomEventMessage) =>
+      handler
+        .effect(BrowserAccess(dem))
+        .as(handler.stopPropagation)
+    }
+
+  def allEventHandlers: AllEventHandlers = {
+    val (eventsSnap, nestedSnap) = eventHandlersSnapshot
+    val local: AllEventHandlers  = eventsSnap.view.mapValues(mapHandlers)
+    local +++ nestedSnap
       .map(_.allEventHandlers)
       .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
+  }
 
   def eventHandlersFor(eventId: EventId): EventHandlers =
-    events
+    val (eventsSnap, nestedSnap) = eventHandlersSnapshot
+    eventsSnap
       .get(eventId)
-      .fold(Vector.empty[DomEventMessage => F[Boolean]]) { handlers =>
-        handlers.map { handler => (dem: DomEventMessage) =>
-          handler
-            .effect(BrowserAccess(dem))
-            .as(handler.stopPropagation)
-        }
-      } ++ nestedComponents.values
+      .fold(Vector.empty[DomEventMessage => F[Boolean]])(mapHandlers) ++ nestedSnap
       .flatMap(_.eventHandlersFor(eventId))
 
   /**
@@ -392,6 +419,9 @@ final class ComponentInstance[
           .runAsyncForget
       } else nested.dropObsoleteMisc()
     }
+
+    // Keep the published handler snapshot consistent with the current live component tree.
+    refreshHandlerSnapshot()
   }
 
   /**
