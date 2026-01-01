@@ -392,12 +392,13 @@ final class ComponentInstance[
       .foldLeft(MapView.empty: AllEventHandlers)(_ +++ _)
   }
 
-  def eventHandlersFor(eventId: EventId): EventHandlers =
+  def eventHandlersFor(eventId: EventId): EventHandlers = {
     val (eventsSnap, nestedSnap) = eventHandlersSnapshot
     eventsSnap
       .get(eventId)
       .fold(Vector.empty[DomEventMessage => F[Boolean]])(mapHandlers) ++ nestedSnap
       .flatMap(_.eventHandlersFor(eventId))
+  }
 
   /**
    * Remove all delays and nested component instances which were not marked
