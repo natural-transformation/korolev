@@ -36,3 +36,85 @@ Korolev runs a single-page application on the server side, keeping in the browse
 ## Tools
 
 * [HTML to Levsha DSL converter](https://fomkin.org/korolev/html-to-levsha)
+
+## Design
+
+Korolev is a server-side SPA framework built on top of **Levsha**.
+The browser runs a small JS bridge.
+The server owns the application state and renders UI updates.
+
+### High-level architecture
+
+Korolev keeps the “real app” on the server.
+The client is responsible for:
+
+- applying DOM changes sent by the server
+- sending user events back to the server
+
+```mermaid
+flowchart LR
+  Browser["Browser<br/>Korolev JS bridge"] <-->|WebSocket| Frontend["Frontend"]
+  Frontend --> App["ApplicationInstance<br/>(one session)"]
+  App --> State["StateManager / StateStorage"]
+  App --> Render["Levsha DiffRenderContext<br/>render + diff"]
+  App --> Router["Router (optional)"]
+```
+
+### Core runtime pieces
+
+- **`ApplicationInstance[F, S, M]`**: one running session. It owns the render loop, state stream, message stream, and the `Frontend`.
+- **`Frontend[F]`**: parses incoming client messages into typed streams (`domEventMessages`, `browserHistoryMessages`) and sends DOM changes back.
+- **`ComponentInstance[F, ...]`**: applies the Levsha document to the render context, collects event handlers, and runs transitions.
+- **`Effect[F[_]]`**: Korolev abstracts over the effect type (Future / cats-effect / ZIO / etc).
+
+### Render/update loop
+
+When state changes, Korolev re-renders and computes a diff using Levsha.
+The server then ships a compact “DOM patch” to the browser.
+
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant F as Frontend
+  participant A as ApplicationInstance
+  participant C as ComponentInstance
+  participant L as Levsha DiffRenderContext
+
+  B->>F: DomEventMessage(targetId, eventType, eventCounter)
+  F->>A: domEventMessages stream
+  A->>C: look up handlers by (targetId,eventType)
+  C->>C: transition() -> enqueue state update
+  A->>A: onState(...) render tick
+  A->>L: swap() + reset()
+  A->>C: applyRenderContext(...)
+  A->>L: finalizeDocument()
+  A->>F: performDomChanges(diff)
+  F->>B: apply DOM patch
+```
+
+### Deterministic ids and “outdated DOM” protection
+
+Korolev relies on Levsha’s deterministic ids (like `1_2_1`) for:
+
+- mapping DOM events back to server-side handlers
+- ensuring events from an outdated DOM are ignored
+
+The client attaches an `eventCounter` to each event.
+The server tracks counters per `(targetId, eventType)` and only accepts events that match the current counter.
+After handling a valid event, it increments the counter and tells the client the new value.
+
+### Startup paths (why dev mode is special)
+
+`ApplicationInstance.initialize()` has two important startup modes:
+
+- **pre-rendered page**: the browser already shows the initial DOM, so Korolev registers handlers and starts streams without needing an initial diff.
+- **dev mode saved render-context**: when `korolev.dev=true` and a saved render-context exists, Korolev loads it and diffs against it to update the browser after reloads.
+
+```mermaid
+flowchart TD
+  Init["initialize()"] --> Check{"dev mode saved?"}
+  Check -- yes --> Saved["load saved render-context<br/>diff + apply changes"]
+  Check -- no --> Pre["pre-rendered page<br/>no initial diff"]
+  Saved --> Streams["start dom/history/state streams"]
+  Pre --> Streams
+```
