@@ -159,17 +159,26 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
                 config.delayedRender
               )
         browserAccess = app.topLevelComponentInstance.browserAccess
-        _ <- config.extensions
-               .map(_.setup(browserAccess))
-               .sequence
-               .flatMap { ehs =>
-                 for {
-                   _ <- Effect[F].start(handleStateChange(app, ehs))
-                   _ <- Effect[F].start(handleMessages(app, ehs))
-                   _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
-                 } yield ()
-               }
-               .start
+        _ <- config
+          .extensions
+          .map { extension =>
+            extension
+              .setup(browserAccess)
+              .recover { error =>
+                config.reporter.error(s"Unable to initialize extension ${extension.name}", error)
+                Extension.Handlers[F, S, M]()
+              }
+          }
+          .sequence
+          .flatMap { ehs =>
+            config.reporter.debug("Extensions init")
+            for {
+              _ <- Effect[F].start(handleStateChange(app, ehs))
+              _ <- Effect[F].start(handleMessages(app, ehs))
+              _ <- Effect[F].start(handleAppOrWsOutgoingCloseOrTimeout(frontend, app, ehs))
+            } yield ()
+          }
+          .start
         _ <- app.initialize()
       } yield {
         app

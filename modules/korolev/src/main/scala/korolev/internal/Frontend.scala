@@ -345,7 +345,7 @@ object Frontend {
     case object RestForm           extends Procedure(14) // (id)
     case object DownloadFile       extends Procedure(15) // (descriptor, fileName)
     case object Heartbeat          extends Procedure(16) // ()
-    case object ResetEventCounters extends Procedure(16) // ()
+    case object ResetEventCounters extends Procedure(17) // ()
 
     val All = Set(
       SetEventCounter,

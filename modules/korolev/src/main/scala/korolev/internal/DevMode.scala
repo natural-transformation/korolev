@@ -66,10 +66,17 @@ private[korolev] object DevMode {
     }
   }
 
-  val isActive = sys.env
-    .get(DevModeKey)
-    .orElse(sys.props.get(DevModeKey))
-    .fold(false)(_ == "true")
+  // NOTE:
+  // We intentionally implement this as a `def` instead of a `val` so tests can
+  // enable/disable dev mode via `-Dkorolev.dev=true` without depending on class-load order.
+  //
+  // (In production this behaves like a constant anyway, because env vars/system properties
+  // are typically fixed for the lifetime of the process.)
+  def isActive: Boolean =
+    sys.env
+      .get(DevModeKey)
+      .orElse(sys.props.get(DevModeKey))
+      .fold(false)(_ == "true")
 
   lazy val workDirectory = {
     val directoryPath = sys.env

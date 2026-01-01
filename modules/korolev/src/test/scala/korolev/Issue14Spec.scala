@@ -1,27 +1,33 @@
 package korolev
 
+import java.util.concurrent.atomic.AtomicInteger
+
 import korolev.effect.{Queue, Reporter, Scheduler}
 import korolev.internal.{ApplicationInstance, Frontend}
 import korolev.state.StateStorage
 import korolev.state.javaSerialization.*
 import korolev.testExecution.*
 import levsha.{Id, StatefulRenderContext, XmlNs}
+import org.scalatest.concurrent.Eventually
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
+import org.scalatest.time.{Millis, Seconds, Span}
+import scala.concurrent.Await
 import scala.concurrent.Future
 import scala.concurrent.duration.*
 
-class Issue14Spec extends AnyFlatSpec with Matchers {
+class Issue14Spec extends AnyFlatSpec with Matchers with Eventually {
 
   import Issue14Spec.context._
   import Reporter.PrintReporter.Implicit
 
   "Korolev" should "ignore events from outdated DOM" in {
 
-    var counter = 0
+    val counter = new AtomicInteger(0)
 
     val incomingMessages = Queue[Future, String]()
     val frontend         = new Frontend[Future](incomingMessages.stream, None)
+    val stateManager     = new StateStorage.SimpleInMemoryStateManager[Future]()
     val app = new ApplicationInstance[Future, Issue14Spec.S, Any](
       sessionId = Qsid("", ""),
       frontend = frontend,
@@ -32,30 +38,30 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
           firstEvents = Seq(
             event("click") { access =>
               access.transition { _ =>
-                counter += 1
+                counter.incrementAndGet()
                 "secondState"
               }
             },
             event("mousedown") { access =>
-              counter += 1
+              counter.incrementAndGet()
               Future.unit
             }
           ),
           secondEvents = Seq(
             event("click") { access =>
               access.transition { _ =>
-                counter += 1
+                counter.incrementAndGet()
                 "firstState"
               }
             },
             event("mousedown") { access =>
-              counter += 1
+              counter.incrementAndGet()
               Future.unit
             }
           )
         )
       },
-      stateManager = new StateStorage.SimpleInMemoryStateManager[Future](),
+      stateManager = stateManager,
       initialState = "firstState",
       reporter = Reporter.PrintReporter,
       scheduler = new Scheduler[Future](),
@@ -78,13 +84,29 @@ class Issue14Spec extends AnyFlatSpec with Matchers {
     def fireEvent(data: String) =
       incomingMessages.offerUnsafe(s"""[0,"$data"]""")
 
-    app.initialize()
+    // Ensure background fibers are started before we push messages into the queue.
+    Await.result(app.initialize(), 2.seconds)
+
+    // First click transitions to secondState.
     fireEvent("0:1_2_1:click")
+
+    // Wait until the state transition has been applied and rendered.
+    eventually(timeout(Span(2, Seconds)), interval(Span(25, Millis))) {
+      Await.result(stateManager.read[Issue14Spec.S](Id.TopLevel), 200.millis) shouldBe Some("secondState")
+      counter.get shouldBe 1
+    }
+
+    // Now fire:
+    // - an outdated click event (counter=0) -> ignored
+    // - a mousedown event (counter=0) -> handled in secondState
+    // - a click event with updated counter (counter=1) -> handled in secondState
     fireEvent("0:1_2_1:click")
     fireEvent("0:1_2_1:mousedown")
     fireEvent("1:1_2_1:click")
 
-    counter should be(3)
+    eventually(timeout(Span(2, Seconds)), interval(Span(25, Millis))) {
+      counter.get shouldBe 3
+    }
   }
 }
 

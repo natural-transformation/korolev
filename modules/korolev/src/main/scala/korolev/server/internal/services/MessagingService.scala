@@ -26,7 +26,6 @@ import korolev.effect.syntax.*
 import korolev.internal.Frontend
 import korolev.server.{HttpResponse, WebSocketResponse}
 import korolev.server.DeflateCompressionService
-import korolev.server.internal.HttpResponse
 import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
@@ -56,7 +55,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
                     case Some(message) =>
                       HttpResponse(
                         status = Response.Status.Ok,
-                        message = message,
+            text = message,
                         headers = commonResponseHeaders
                       )
                   }

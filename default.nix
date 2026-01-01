@@ -10,18 +10,27 @@
                    sha256 = "sha256:vky6VPK1n1od6vXbqzOXnekrQpTL4hbPAwUhT5J9c9E=";
                  };
                in import src { inherit (pkgs) lib; })
+, sbtix
 }:
 
 let
-  sbtix = pkgs.callPackage ./sbtix.nix {};
+  # sbtix is provided by flake.nix from the sbtix flake input
+  projectProjectRepoPath = ./project/project/repo.nix;
+  projectProjectRepo =
+    if builtins.pathExists projectProjectRepoPath
+    then import projectProjectRepoPath
+    else {};
 in
   sbtix.buildSbtLibrary {
-    name = "root";
+    name = "korolev";
     src = cleanSource (gitignore.gitignoreSource ./.);
     #sbtixBuildInputs = pkgs.callPackage ./sbtix-build-inputs.nix {};
     repo = [
       (import ./repo.nix)
       (import ./project/repo.nix)
+      # Some sbt plugins (from project/plugins.sbt) end up locked under
+      # project/project/repo.nix. Include it so Nix builds stay fully offline.
+      projectProjectRepo
       (import ./manual-repo.nix)
     ];
   }

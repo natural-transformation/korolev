@@ -36,7 +36,7 @@ class Zio2Effect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: 
     ZIO.fail(e).mapError(liftError)
 
   def blocking[T](f: => T)(implicit ec: ExecutionContext): ZIO[R, E, T] =
-    ZIO.attempt(f).mapError(liftError)
+    ZIO.attemptBlocking(f).mapError(liftError)
 
   def unit: ZIO[R, E, Unit] =
     ZIO.unit

@@ -16,3 +16,6 @@ target/
 .metals
 *metals.sbt
 .bsp
+
+examples/**/*.nix
+result*

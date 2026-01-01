@@ -18,7 +18,6 @@ package korolev.server.internal.services
 
 import korolev.effect.{Effect, Stream}
 import korolev.server.HttpResponse
-import korolev.server.internal.HttpResponse
 import korolev.web.Response
 
 private[korolev] final class CommonService[F[_]: Effect] {

@@ -190,29 +190,20 @@ object HttpClientSpec {
     implicit val system           = ActorSystem(Behaviors.empty, "http-client-test-system")
     implicit val executionContext = system.executionContext
 
-    def tryBind(retries: Int) = {
-      def nextPort = util.Random.nextInt(64000) + 1000 // select port 1000..64000
-      def aux(port: Int, retries: Int, portAttempts: List[Int]): Future[(Int, Http.ServerBinding)] = retries match {
-        case 0 =>
-          Future.failed(new Exception(s"Unable to bind HTTP server. Tried ports: [${portAttempts.mkString(", ")}]"))
-        case _ =>
-          Http()
-            .newServerAt("localhost", port)
-            .bind(route)
-            .map(binding => (port, binding))
-            .recoverWith { case _: BindException => aux(nextPort, retries - 1, port :: portAttempts) }
+    // Bind on port 0 so the OS picks a free ephemeral port.
+    // This avoids flaky "Address already in use" failures caused by random-port selection.
+    Http()
+      .newServerAt("localhost", 0)
+      .bind(route)
+      .flatMap { binding =>
+        val port = binding.localAddress.getPort
+        f(port).transformWith { tryResult =>
+          for {
+            _      <- binding.unbind()
+            _       = system.terminate()
+            result <- Future.fromTry(tryResult)
+          } yield result
+        }
       }
-      aux(nextPort, retries, Nil)
-    }
-
-    tryBind(5).flatMap { case (port, binding) =>
-      f(port).transformWith { tryResult =>
-        for {
-          _      <- binding.unbind()
-          _       = system.terminate()
-          result <- Future.fromTry(tryResult)
-        } yield result
-      }
-    }
   }
 }

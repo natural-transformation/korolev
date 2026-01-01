@@ -21,6 +21,8 @@ import korolev.effect.Effect
 
 trait Extension[F[_], S, M] {
 
+  def name: String
+
   /**
    * Invokes then new sessions created
    * @return
@@ -30,26 +32,26 @@ trait Extension[F[_], S, M] {
 
 object Extension {
 
-  abstract class Handlers[F[_]: Effect, S, M] {
+  trait Handlers[F[_], S, M] {
 
     /**
      * Invokes when state updated.
      * @return
      */
-    def onState(state: S): F[Unit] = Effect[F].unit
+    def onState(state: S): F[Unit]
 
     /**
      * Invokes when message published.
      * @see
      *   Context.BaseAccess.publish
      */
-    def onMessage(message: M): F[Unit] = Effect[F].unit
+    def onMessage(message: M): F[Unit]
 
     /**
      * Invokes when user closes tab.
      * @return
      */
-    def onDestroy(): F[Unit] = Effect[F].unit
+    def onDestroy(): F[Unit]
   }
 
   private final class HandlersImpl[F[_]: Effect, S, M](
@@ -60,6 +62,13 @@ object Extension {
     override def onState(state: S): F[Unit]     = _onState(state)
     override def onMessage(message: M): F[Unit] = _onMessage(message)
     override def onDestroy(): F[Unit]           = _onDestroy()
+  }
+
+  private class UnnamedExtension[F[_], S, M](f: Context.BaseAccess[F, S, M] => F[Handlers[F, S, M]])
+      extends Extension[F, S, M] {
+    final val name: String = "unnamed"
+    override def setup(access: Context.BaseAccess[F, S, M]): F[Handlers[F, S, M]] =
+      f(access)
   }
 
   object Handlers {
@@ -85,8 +94,8 @@ object Extension {
   }
 
   def apply[F[_], S, M](f: Context.BaseAccess[F, S, M] => F[Handlers[F, S, M]]): Extension[F, S, M] =
-    (access: Context.BaseAccess[F, S, M]) => f(access)
+    new UnnamedExtension(f)
 
   def pure[F[_]: Effect, S, M](f: Context.BaseAccess[F, S, M] => Handlers[F, S, M]): Extension[F, S, M] =
-    (access: Context.BaseAccess[F, S, M]) => Effect[F].pure(f(access))
+    new UnnamedExtension(access => Effect[F].pure(f(access)))
 }

@@ -16,28 +16,25 @@ package object streams {
       }
   }
 
-  private type Finalizer = Exit[Any, Any] => UIO[Any]
+  private type Finalizer = Exit[Any, Any] => UIO[Unit]
 
   implicit class ZStreamOps[R, O](stream: ZStream[R, Throwable, O]) {
 
-    def toKorolev(implicit eff: KorolevEffect[RIO[R, *]]): RIO[R, ZKorolevStream[R, O]] =
-      Ref.make(List.empty[Finalizer]).flatMap { finalizersRef =>
-        val scope = new Scope {
-          def addFinalizerExit(finalizer: Finalizer)(implicit trace: Trace): UIO[Unit] =
-            finalizersRef.update(finalizer :: _)
-          def forkWith(executionStrategy: => ExecutionStrategy)(implicit trace: Trace): UIO[Scope.Closeable] =
-            ZIO.dieMessage("Can't fork ZKorolevStream")
-        }
-        (for {
-          pull   <- stream.toPull
-          zStream = ZKorolevStream[R, O](pull, finalizersRef)
-        } yield zStream).provideSomeLayer[R](ZLayer.succeed(scope))
+    def toKorolev(implicit eff: KorolevEffect[RIO[R, *]]): RIO[R, ZKorolevStream[R, O]] = {
+      Scope.make.flatMap { scope =>
+        scope.use[R](
+          for {
+            pull    <- stream.toPull
+            zStream = ZKorolevStream[R, O](pull, scope.close(_))
+          } yield zStream
+        )
       }
+    }
   }
 
   private[streams] case class ZKorolevStream[R, O](
     zPull: ZIO[R, Option[Throwable], Chunk[O]],
-    finalizersRef: Ref[List[Finalizer]]
+    finalizer: Finalizer
   )(implicit eff: KorolevEffect[RIO[R, *]])
       extends KorolevStream[RIO[R, *], Seq[O]] {
 
@@ -45,9 +42,6 @@ package object streams {
       zPull.option
 
     def cancel(): RIO[R, Unit] =
-      for {
-        finalizers <- finalizersRef.get
-        _          <- ZIO.collectAll(finalizers.map(_(Exit.unit))).unit
-      } yield ()
+      finalizer(Exit.unit)
   }
 }

@@ -318,7 +318,7 @@ export class Korolev {
     */
   setStyle(id, name, value) {
     var element = this.els[id];
-    element.style[name] = value;
+    element.style.setProperty(name, value);
   }
 
    /**
@@ -327,7 +327,7 @@ export class Korolev {
     */
   removeStyle(id, name) {
     var element = this.els[id];
-    element.style[name] = null;
+    element.style.removeProperty(name);
   }
 
    /**
