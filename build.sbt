@@ -3,7 +3,7 @@ import xerial.sbt.Sonatype._
 val scala2_13Version = "2.13.12"
 val scala3Version    = "3.3.1"
 
-val levshaVersion = "1.3.0"
+val levshaVersion = "1.6.1"
 
 val akkaVersion     = "2.6.19"
 val akkaHttpVersion = "10.2.9"
@@ -26,9 +26,21 @@ val scodecVersion = "1.1.34"
 
 scalaVersion := scala3Version
 
-val VERSION = "1.17.1"
+def releaseVersion: String = sys.env.getOrElse("RELEASE_VERSION", "")
+def isRelease: Boolean     = releaseVersion != ""
+val BaseVersion            = "1.18.0"
+def publishVersion: String = if (isRelease) releaseVersion else s"$BaseVersion-SNAPSHOT"
 
-version := VERSION
+// Keep build-wide `version` in sync with the version we actually publish.
+//
+// We enable sbt-git `GitVersioning`, which can set `ThisBuild / version` to a git-derived
+// `...-SNAPSHOT` value. At the same time we explicitly publish `publishVersion` for each module.
+// If those ever diverge, sbt keys like `isSnapshot` (and Sonatype bundling directories)
+// can become inconsistent and route release artifacts to the snapshots repository.
+//
+// By pinning `ThisBuild / version` here, we make `ThisBuild / version`, per-project `version`,
+// and publishing agree.
+ThisBuild / version := publishVersion
 
 val unusedRepo = Some(Resolver.file("Unused transient repository", file("target/unusedrepo")))
 
@@ -36,11 +48,42 @@ val crossVersionSettings = Seq(
   crossScalaVersions := Seq(scala2_13Version, scala3Version)
 )
 
-credentials += Credentials(Path.userHome / ".sbt" / "sonatype_credentials")
+// OSSRH (Nexus 2) is sunset; publishing happens via Sonatype Central.
+//
+// - SNAPSHOTs: publish directly to the Central Portal snapshots repository.
+// - Releases: use sbt-sonatype's *Central* commands (sonatypeCentralUpload/sonatypeCentralRelease),
+//   which talk to the OSSRH Staging API Service (a compatibility layer backed by Central).
+//
+// Docs:
+// - https://central.sonatype.org/pages/ossrh-eol/
+// - https://central.sonatype.org/publish/publish-portal-snapshots/
+val CentralPortalHost           = "central.sonatype.com"
+val CentralPortalSnapshotsRepo  = "https://central.sonatype.com/repository/maven-snapshots/"
+val CentralNexusRealm           = "Sonatype Nexus Repository Manager"
+val OssrhStagingApiHost         = "ossrh-staging-api.central.sonatype.com"
+val OssrhStagingApiServiceLocal = "https://ossrh-staging-api.central.sonatype.com/service/local"
+val OssrhStagingApiRealm        = "OSSRH Staging API Service"
 
-sonatypeCredentialHost := "s01.oss.sonatype.org"
-sonatypeProfileName    := "com.natural-transformation"
-publishTo              := sonatypePublishToBundle.value
+// Dependency resolution:
+// If we depend on SNAPSHOT artifacts (eg levsha during local development), we must add the
+// Central Portal snapshots repository as a resolver. Maven Central does NOT host snapshots.
+ThisBuild / resolvers ++=
+  (if (levshaVersion.endsWith("-SNAPSHOT")) Seq("central-portal-snapshots" at CentralPortalSnapshotsRepo)
+   else Nil)
+
+// Publishing credentials (env vars):
+// - SONATYPE_CENTRAL_*: Central Portal snapshots repository (central.sonatype.com)
+// - SONATYPE_STAGING_*: OSSRH Staging API Service for releases (ossrh-staging-api.central.sonatype.com)
+val CentralUserEnvVar = "SONATYPE_CENTRAL_USERNAME"
+val CentralPassEnvVar = "SONATYPE_CENTRAL_PASSWORD"
+val StagingUserEnvVar = "SONATYPE_STAGING_USERNAME"
+val StagingPassEnvVar = "SONATYPE_STAGING_PASSWORD"
+
+def envUserPass(userKey: String, passKey: String): Option[(String, String)] = {
+  val user = sys.env.getOrElse(userKey, "")
+  val pass = sys.env.getOrElse(passKey, "")
+  if (user.nonEmpty && pass.nonEmpty) Some((user, pass)) else None
+}
 
 val dontPublishSettings = Seq(
   publish         := {},
@@ -53,9 +96,66 @@ val publishSettings = Seq(
   publishMavenStyle      := true,
   Test / publishArtifact := false,
   pomIncludeRepository   := { _ => false },
-  publishTo              := sonatypePublishToBundle.value,
-  sonatypeCredentialHost := "s01.oss.sonatype.org",
-  // sonatypeRepository := "https://s01.oss.sonatype.org/service/local",
+  credentials ++= {
+    val credsFile = Path.userHome / ".sbt" / "sonatype_credentials"
+    // We support either:
+    // - ~/.sbt/sonatype_credentials (local; user/pass reused for both endpoints)
+    // - SONATYPE_CENTRAL_USERNAME / SONATYPE_CENTRAL_PASSWORD (Central Portal snapshots)
+    // - SONATYPE_STAGING_USERNAME / SONATYPE_STAGING_PASSWORD (release publishing via OSSRH Staging API Service)
+    val userPassFromFile: Option[(String, String)] =
+      if (credsFile.exists()) {
+        val kv =
+          IO.readLines(credsFile)
+            .iterator
+            .map(_.trim)
+            .filter(l => l.nonEmpty && !l.startsWith("#"))
+            .flatMap { l =>
+              l.split("=", 2) match {
+                case Array(k, v) => Some((k.trim.toLowerCase, v.trim))
+                case _           => None
+              }
+            }
+            .toMap
+
+        val user = kv.get("user").orElse(kv.get("username")).getOrElse("")
+        val pass = kv.getOrElse("password", "")
+
+        if (user.nonEmpty && pass.nonEmpty) Some((user, pass)) else None
+      } else None
+
+    val centralUserPass: Option[(String, String)] =
+      envUserPass(CentralUserEnvVar, CentralPassEnvVar).orElse(userPassFromFile)
+
+    val stagingUserPass: Option[(String, String)] =
+      envUserPass(StagingUserEnvVar, StagingPassEnvVar).orElse(userPassFromFile)
+
+    val creds = Seq.newBuilder[Credentials]
+
+    centralUserPass.foreach { case (user, pass) =>
+      // Central Portal snapshots (for -SNAPSHOT versions)
+      creds += Credentials(CentralNexusRealm, CentralPortalHost, user, pass)
+    }
+
+    stagingUserPass.foreach { case (user, pass) =>
+      // OSSRH Staging API Service (for releases; backed by Central)
+      creds += Credentials(OssrhStagingApiRealm, OssrhStagingApiHost, user, pass)
+    }
+
+    creds.result()
+  },
+  // For snapshots, publish directly to the Central Portal snapshots repository.
+  // For releases, keep using sbt-sonatype's bundle flow (which uses the staging API host below).
+  publishTo := {
+    // `isSnapshot` can delegate to `ThisBuild / version` (eg when sbt-git sets it),
+    // which may differ from the per-project `version` used for publishing.
+    // Use the project's `version` directly to avoid publishing a release to the snapshots repo.
+    if (version.value.endsWith("-SNAPSHOT")) Some("central-portal-snapshots" at CentralPortalSnapshotsRepo)
+    else sonatypePublishToBundle.value
+  },
+  // sbt-sonatype Central commands use the OSSRH Staging API Service (backed by Central).
+  // sonatypeCentral* commands require the credential host to be `central.sonatype.com`.
+  sonatypeCredentialHost := CentralPortalHost,
+  sonatypeRepository     := OssrhStagingApiServiceLocal,
   sonatypeProfileName    := "com.natural-transformation",
   sonatypeProjectHosting := Some(GitHubHosting("natural-transformation", "korolev", "zli@natural-transformation.com")),
   headerLicense := Some(HeaderLicense.ALv2("2024", "Natural Transformation BV")),
@@ -66,7 +166,7 @@ val commonSettings = publishSettings ++ Seq(
   git.useGitDescribe := true,
   organization       := "com.natural-transformation",
   scalaVersion       := scala3Version,
-  version            := VERSION,
+  version            := publishVersion,
   scalafmtOnCompile  := false,
   // Add Scala 2 compiler plugins
   libraryDependencies ++= {
@@ -184,8 +284,8 @@ lazy val korolev = project
   .settings(
     normalizedName := "korolev",
     libraryDependencies ++= Seq(
-      "com.github.fomkin" %% "levsha-core"   % levshaVersion,
-      "com.github.fomkin" %% "levsha-events" % levshaVersion
+      "com.natural-transformation" %% "levsha-core"   % levshaVersion,
+      "com.natural-transformation" %% "levsha-events" % levshaVersion
     ),
     Compile / resourceGenerators += Def.task {
       val source = baseDirectory.value / "src" / "main" / "es6"
