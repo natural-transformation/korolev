@@ -85,6 +85,65 @@ def envUserPass(userKey: String, passKey: String): Option[(String, String)] = {
   if (user.nonEmpty && pass.nonEmpty) Some((user, pass)) else None
 }
 
+// Publishing credentials:
+//
+// We support either:
+// - ~/.sbt/sonatype_credentials (local; user/pass reused for both endpoints)
+// - SONATYPE_CENTRAL_USERNAME / SONATYPE_CENTRAL_PASSWORD (Central Portal snapshots)
+// - SONATYPE_STAGING_USERNAME / SONATYPE_STAGING_PASSWORD (release publishing via OSSRH Staging API Service)
+def sonatypeCredentials: Seq[Credentials] = {
+  val credsFile = Path.userHome / ".sbt" / "sonatype_credentials"
+  val userPassFromFile: Option[(String, String)] =
+    if (credsFile.exists()) {
+      val kv =
+        IO.readLines(credsFile)
+          .iterator
+          .map(_.trim)
+          .filter(l => l.nonEmpty && !l.startsWith("#"))
+          .flatMap { l =>
+            l.split("=", 2) match {
+              case Array(k, v) => Some((k.trim.toLowerCase, v.trim))
+              case _           => None
+            }
+          }
+          .toMap
+
+      val user = kv.get("user").orElse(kv.get("username")).getOrElse("")
+      val pass = kv.getOrElse("password", "")
+
+      if (user.nonEmpty && pass.nonEmpty) Some((user, pass)) else None
+    } else None
+
+  val centralUserPass: Option[(String, String)] =
+    envUserPass(CentralUserEnvVar, CentralPassEnvVar).orElse(userPassFromFile)
+
+  val stagingUserPass: Option[(String, String)] =
+    envUserPass(StagingUserEnvVar, StagingPassEnvVar).orElse(userPassFromFile)
+
+  val creds = Seq.newBuilder[Credentials]
+
+  centralUserPass.foreach { case (user, pass) =>
+    // Central Portal snapshots (for -SNAPSHOT versions)
+    creds += Credentials(CentralNexusRealm, CentralPortalHost, user, pass)
+  }
+
+  stagingUserPass.foreach { case (user, pass) =>
+    // OSSRH Staging API Service (for releases; backed by Central)
+    creds += Credentials(OssrhStagingApiRealm, OssrhStagingApiHost, user, pass)
+  }
+
+  creds.result()
+}
+
+// IMPORTANT:
+// The release CI runs `sbt sonatypeCentralRelease` from the root aggregator project.
+// Root does NOT use `publishSettings`, so we must wire Sonatype settings at the build level too.
+ThisBuild / credentials ++= sonatypeCredentials
+ThisBuild / sonatypeCredentialHost := CentralPortalHost
+ThisBuild / sonatypeRepository     := OssrhStagingApiServiceLocal
+ThisBuild / sonatypeProfileName    := "com.natural-transformation"
+ThisBuild / sonatypeProjectHosting := Some(GitHubHosting("natural-transformation", "korolev", "zli@natural-transformation.com"))
+
 val dontPublishSettings = Seq(
   publish         := {},
   publishTo       := unusedRepo,
@@ -96,53 +155,8 @@ val publishSettings = Seq(
   publishMavenStyle      := true,
   Test / publishArtifact := false,
   pomIncludeRepository   := { _ => false },
-  credentials ++= {
-    val credsFile = Path.userHome / ".sbt" / "sonatype_credentials"
-    // We support either:
-    // - ~/.sbt/sonatype_credentials (local; user/pass reused for both endpoints)
-    // - SONATYPE_CENTRAL_USERNAME / SONATYPE_CENTRAL_PASSWORD (Central Portal snapshots)
-    // - SONATYPE_STAGING_USERNAME / SONATYPE_STAGING_PASSWORD (release publishing via OSSRH Staging API Service)
-    val userPassFromFile: Option[(String, String)] =
-      if (credsFile.exists()) {
-        val kv =
-          IO.readLines(credsFile)
-            .iterator
-            .map(_.trim)
-            .filter(l => l.nonEmpty && !l.startsWith("#"))
-            .flatMap { l =>
-              l.split("=", 2) match {
-                case Array(k, v) => Some((k.trim.toLowerCase, v.trim))
-                case _           => None
-              }
-            }
-            .toMap
-
-        val user = kv.get("user").orElse(kv.get("username")).getOrElse("")
-        val pass = kv.getOrElse("password", "")
-
-        if (user.nonEmpty && pass.nonEmpty) Some((user, pass)) else None
-      } else None
-
-    val centralUserPass: Option[(String, String)] =
-      envUserPass(CentralUserEnvVar, CentralPassEnvVar).orElse(userPassFromFile)
-
-    val stagingUserPass: Option[(String, String)] =
-      envUserPass(StagingUserEnvVar, StagingPassEnvVar).orElse(userPassFromFile)
-
-    val creds = Seq.newBuilder[Credentials]
-
-    centralUserPass.foreach { case (user, pass) =>
-      // Central Portal snapshots (for -SNAPSHOT versions)
-      creds += Credentials(CentralNexusRealm, CentralPortalHost, user, pass)
-    }
-
-    stagingUserPass.foreach { case (user, pass) =>
-      // OSSRH Staging API Service (for releases; backed by Central)
-      creds += Credentials(OssrhStagingApiRealm, OssrhStagingApiHost, user, pass)
-    }
-
-    creds.result()
-  },
+  // Credentials are configured at `ThisBuild` scope above so `sonatypeCentralRelease` works
+  // even when invoked from the root aggregator project.
   // For snapshots, publish directly to the Central Portal snapshots repository.
   // For releases, keep using sbt-sonatype's bundle flow (which uses the staging API host below).
   publishTo := {
