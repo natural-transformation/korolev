@@ -185,11 +185,11 @@
         "nixpkgs": "nixpkgs_3"
       },
       "locked": {
-        "lastModified": 1766007256,
-        "narHash": "sha256-UIJjNBgBracQX5gkDmEQB0jD4tCNxeMu4M2fLs7zamA=",
+        "lastModified": 1767444808,
+        "narHash": "sha256-yb+0po9C3hJiv7rO+/ZS7Yj2YWyZ79EmV7q2MQ8M82k=",
         "owner": "natural-transformation",
         "repo": "sbtix",
-        "rev": "cea84ef6e5c1fdaddf86d14ec7406d27c6eb272b",
+        "rev": "956b674d318255b091daacbfc63e0d185e372cdd",
         "type": "github"
       },
       "original": {
