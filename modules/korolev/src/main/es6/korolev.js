@@ -35,7 +35,7 @@ export class Korolev {
     this.config = config;
     /** @type {HTMLElement} */
     this.root = document.children[0];
-    /** @type {Object<Element>} */
+    /** @type {Object<?Node>} */
     this.els = {};
     /** @type {Object<number>} */
     this.eventCounters = {};
@@ -115,8 +115,9 @@ export class Korolev {
     this.eventCounters = {};
   }
 
-  /** @param {HTMLElement} rootNode */
+  /** @param {?HTMLElement} rootNode */
   registerRoot(rootNode) {
+    if (!rootNode) return;
     let self = this;
     function aux(prefix, node) {
       var children = node.childNodes;
@@ -370,6 +371,7 @@ export class Korolev {
   uploadForm(id, descriptor) {
     let self = this;
     var form = self.els[id];
+    if (!(form instanceof HTMLFormElement)) return;
     var formData = new FormData(form);
     var request = new XMLHttpRequest();
     var uri = self.config['r'] +

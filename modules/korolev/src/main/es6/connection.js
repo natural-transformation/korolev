@@ -96,10 +96,11 @@ export class Connection {
     this._textEncoder = new TextEncoder();
     this._webSocket = new WebSocket(uri, protocols);
     this._webSocket.binaryType = 'blob';
+    const webSocketWithProtocol = /** @type {{protocol: string}} */ (this._webSocket);
     this._send = async (message) => {
       let blob = new Blob([this._textEncoder.encode(message)]);
-      if (this._webSocket.protocol == 'json-deflate') {
-        let stream = blob
+      if (webSocketWithProtocol.protocol == 'json-deflate') {
+        let stream = /** @type {{stream: function(): *}} */ (blob)
           .stream()
           .pipeThrough(new CompressionStream('deflate-raw'))
         blob = await new Response(stream).blob();
@@ -114,8 +115,8 @@ export class Connection {
 
     let processMessage = async (data) => {
       if (data instanceof Blob) {
-        if (this._webSocket.protocol == 'json-deflate') {
-          let stream = data
+        if (webSocketWithProtocol.protocol == 'json-deflate') {
+          let stream = /** @type {{stream: function(): *}} */ (data)
             .stream()
             .pipeThrough(new DecompressionStream('deflate-raw'));
           data = await new Response(stream).blob();
@@ -128,13 +129,16 @@ export class Connection {
         } else {
           let reader = new FileReader();
           reader.onload = async () => {
-            data = reader.result;
-            this._onMessage(data);
+            const text = /** @type {string} */ (reader.result);
+            this._onMessage(text);
           }
           reader.readAsText(data);
         }
+      } else if (data instanceof ArrayBuffer) {
+        const decoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder();
+        this._onMessage(decoder ? decoder.decode(new Uint8Array(data)) : String(data));
       } else {
-        this._onMessage(data);
+        this._onMessage(String(data));
       }
     }
 
