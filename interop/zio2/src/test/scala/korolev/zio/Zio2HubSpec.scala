@@ -12,7 +12,7 @@ object Zio2HubSpec extends ZIOSpecDefault {
 
   implicit val effect: Zio2Effect[Any, Throwable] = new Zio2Effect[Any, Throwable](runtime, identity, identity)
 
-  def spec =
+  override def spec: Spec[Environment with TestEnvironment with Scope, Any] =
     suite("Hub Spec")(
       suite("sequential publishers and subscribers")(
         test("with one publisher and one subscriber") {
