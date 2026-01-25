@@ -4,15 +4,16 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.NoSuchElementException
 import korolev.{Context, Qsid, Transition, TransitionAsync}
-import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId, MappedAccess}
+import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId}
 import korolev.data.Bytes
 import korolev.effect.Effect
 import korolev.effect.Stream
 import korolev.effect.syntax.*
 import korolev.internal.Frontend.ClientSideException
-import korolev.util.{JsCode, Lens}
+import korolev.util.JsCode
 import korolev.web.FormData
 import org.graalvm.polyglot.HostAccess
+import scala.collection.immutable.Seq
 import scala.collection.mutable
 
 case class Browser(
@@ -172,7 +173,7 @@ case class Browser(
       def downloadFiles(id: ElementId): F[List[(Context.FileHandler, Bytes)]] =
         Effect[F].delay {
           browser.filesMap(id).toList map { case (name, bytes) =>
-            Context.FileHandler(name, bytes.length)(id) -> Bytes.wrap(bytes)
+            Context.FileHandler(name, bytes.length.toLong)(id) -> Bytes.wrap(bytes)
           }
         }
 
@@ -180,7 +181,7 @@ case class Browser(
         Effect[F].sequence {
           browser.filesMap(id).toList map { case (name, ba) =>
             val bytes = Bytes.wrap(ba)
-            val h     = Context.FileHandler(name, ba.length)(id)
+            val h     = Context.FileHandler(name, ba.length.toLong)(id)
             Stream(bytes).mat().map { s =>
               (h, s)
             }
@@ -205,7 +206,7 @@ case class Browser(
       def listFiles(id: ElementId): F[List[Context.FileHandler]] =
         Effect[F].delay {
           browser.filesMap(id).toList map { case (name, bytes) =>
-            Context.FileHandler(name, bytes.length)(id)
+            Context.FileHandler(name, bytes.length.toLong)(id)
           }
         }
 
@@ -228,15 +229,16 @@ case class Browser(
           bindings.putMember("code", finalCode)
           bindings.putMember("handler", handler)
 
+          // Preserve JS template literals by escaping Scala interpolation.
           context.eval(
             "js",
-            jsMocks.mkString("\n") + """
+            jsMocks.mkString("\n") + s"""
               var result;
               var status = 0;
               try {
                 result = eval(code);
               } catch (e) {
-                console.error(`Error evaluating code ${code}`, e);
+                console.error(`Error evaluating code $${code}`, e);
                 result = e;
                 status = 1;
               }
@@ -245,7 +247,7 @@ case class Browser(
                 result.then(
                   (res) => handler.result(JSON.stringify(res)),
                   (err) => {
-                    console.error(`Error evaluating code ${code}`, err);
+                    console.error(`Error evaluating code $${code}`, err);
                     handler.error(err.toString())
                   }
                 );

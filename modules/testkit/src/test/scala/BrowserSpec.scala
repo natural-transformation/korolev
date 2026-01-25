@@ -1,6 +1,5 @@
 import korolev.Context
 import korolev.Context.ElementId
-import korolev.state.javaSerialization._
 import korolev.testkit.{Action, Browser}
 import org.scalatest.flatspec.AsyncFlatSpec
 import org.scalatest.matchers.should.Matchers
