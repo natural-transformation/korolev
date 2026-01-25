@@ -24,7 +24,7 @@ class ZIOStreamsInteropTest extends AsyncFlatSpec with Matchers {
           .run(ZSink.foldLeft(List.empty[Int]) { case (acc, v) => acc :+ v })
       }
 
-    zio.Unsafe.unsafeCompat { implicit u =>
+    zio.Unsafe.unsafe { implicit u =>
       runtime.unsafe.runToFuture(io).map { result =>
         result shouldEqual values
       }
@@ -47,7 +47,7 @@ class ZIOStreamsInteropTest extends AsyncFlatSpec with Matchers {
       } yield {
         result shouldEqual List(1, 2, 3, 4, 5)
       }
-    zio.Unsafe.unsafeCompat { implicit u =>
+    zio.Unsafe.unsafe { implicit u =>
       runtime.unsafe.runToFuture(io)
     }
   }
@@ -67,7 +67,7 @@ class ZIOStreamsInteropTest extends AsyncFlatSpec with Matchers {
             .fold(Vector.empty[Int])((acc, value) => acc :+ value)
             .map(result => result shouldEqual values)
         }
-    zio.Unsafe.unsafeCompat { implicit u =>
+    zio.Unsafe.unsafe { implicit u =>
       runtime.unsafe.runToFuture(io)
     }
   }

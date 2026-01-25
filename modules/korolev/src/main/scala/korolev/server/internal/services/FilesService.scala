@@ -39,7 +39,10 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         val fsPath              = path.mkString
         val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
         maybeResourceStream.fold(notFoundToken) { javaSyncStream =>
-          val _ / fileName = path
+          val fileName = path match {
+            case p: PathAndQuery./ => p.value
+            case Root              => ""
+          }
           val fileExtension = fileName.lastIndexOf('.') match {
             case -1    => "bin" // default file extension
             case index => fileName.substring(index + 1)

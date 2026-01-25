@@ -118,8 +118,6 @@ package object akka {
                     },
                     Some(selectedProtocol)
                   )
-                case _ =>
-                  throw new RuntimeException // cannot happen
               }
               .recover { case BadRequestException(message) =>
                 HttpResponse(StatusCodes.BadRequest, entity = HttpEntity(message))
@@ -193,7 +191,7 @@ package object akka {
       }
     }
     val (contentTypeHeaders, otherHeaders) = headers.partition(_.lowercaseName() == "content-type")
-    val contentTypeOpt                     = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
+    val contentTypeOpt                     = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).toOption)
     (contentTypeOpt, otherHeaders.toList)
   }
 }

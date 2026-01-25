@@ -120,6 +120,9 @@ class SecureDataSocket[F[_]: Effect, B: BytesLike] private (engine: SSLEngine, s
         // netBuffer doesn't have required capacity
         netBuffer = ByteBuffer.allocate(engine.getSession.getPacketBufferSize)
         doWrap()
+      case Status.BUFFER_UNDERFLOW =>
+        // Not enough application data to wrap yet.
+        Effect[F].pure(true)
       case Status.CLOSED => Effect[F].pure(false)
     }
   }

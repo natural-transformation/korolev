@@ -102,7 +102,7 @@ class Zio2Effect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: 
     ZIO.collectAll(in)
 
   def runAsync[A](m: ZIO[R, E, A])(callback: Either[Throwable, A] => Unit): Unit =
-    Unsafe.unsafeCompat { implicit u: Unsafe =>
+    Unsafe.unsafe { implicit u: Unsafe =>
       rts.unsafe
         .fork(m)
         .unsafe
@@ -110,14 +110,14 @@ class Zio2Effect[R, E](rts: Runtime[R], liftError: Throwable => E, unliftError: 
     }
 
   def run[A](m: ZIO[R, E, A]): Either[Throwable, A] =
-    Unsafe.unsafeCompat { implicit u: Unsafe =>
+    Unsafe.unsafe { implicit u: Unsafe =>
       rts.unsafe
         .run(m)
         .toEither
     }
 
   def toFuture[A](m: ZIO[R, E, A]): Future[A] =
-    Unsafe.unsafeCompat { implicit u: Unsafe =>
+    Unsafe.unsafe { implicit u: Unsafe =>
       val unlifted = m.mapError(unliftError)
       rts.unsafe.runToFuture(unlifted)
     }

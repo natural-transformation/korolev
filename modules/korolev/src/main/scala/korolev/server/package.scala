@@ -90,19 +90,20 @@ package object server {
     implicit val exeContext: ExecutionContext = config.executionContext
 
     // TODO remove this when render/node fields will be removed
+    def legacyDocument(state: S) = {
+      import levsha.dsl._
+      import levsha.dsl.html._
+      optimize[Binding[F, S, M]] {
+        Html(
+          head(config.head(state)),
+          config.render(state)
+        )
+      }
+    }
+
     val actualConfig =
       if (config.document == null) {
-
-        config.copy(document = { (state: S) =>
-          import levsha.dsl._
-          import levsha.dsl.html._
-          optimize[Binding[F, S, M]] {
-            Html(
-              head(config.head(state)),
-              config.render(state)
-            )
-          }
-        })
+        config.copy(document = legacyDocument)
       } else {
         config
       }

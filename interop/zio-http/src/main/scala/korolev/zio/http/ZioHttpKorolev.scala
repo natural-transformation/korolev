@@ -2,6 +2,7 @@ package korolev.zio.http
 
 import _root_.zio.{Chunk, NonEmptyChunk, RIO, ZIO}
 import _root_.zio.http.*
+import _root_.zio.http.codec.PathCodec
 import _root_.zio.stream.ZStream
 import korolev.data.{Bytes, BytesLike}
 import korolev.effect.{Queue, Stream as KStream}
@@ -24,45 +25,39 @@ class ZioHttpKorolev[R] {
 
   def service[S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[RIO[R, *], S, M]
-  )(implicit eff: ZEffect): HttpApp[R, Throwable] = {
+  )(implicit eff: ZEffect): Routes[R, Response] = {
 
     val korolevServer = korolev.server.korolevService(config)
 
     val rootPath = Path.decode(config.rootPath.mkString)
 
-    def app(req: Request): ZIO[R, Throwable, Response] = req match {
-
-      case req if matchWebSocket(req) =>
-        routeWsRequest(req, subPath(req.url.path, rootPath.segments.length), korolevServer)
-
-      case req =>
-        routeHttpRequest(rootPath, req, korolevServer)
+    val handler = Handler.fromFunctionZIO[(Path, Request)] { case (path, req) =>
+      val subPath = path.encode
+      val response =
+        if (matchWebSocket(req)) routeWsRequest(req, subPath, korolevServer)
+        else routeHttpRequest(subPath, req, korolevServer)
+      response.mapError(Response.fromThrowable)
     }
 
-    Http.collectZIO {
-      case req if matchPrefix(rootPath, req.url.path) => app(req)
-    }
+    Routes.singleton(handler).nest(prefixCodec(rootPath))
   }
 
   private def matchWebSocket(req: Request): Boolean =
     req.method == Method.GET && containsUpgradeHeader(req)
 
-  private def routeHttpRequest(rootPath: Path, req: Request, korolevServer: KorolevService[RIO[R, *]])(implicit
+  private def routeHttpRequest(subPath: String, req: Request, korolevServer: KorolevService[RIO[R, *]])(implicit
     eff: ZEffect
   ): ZIO[R, Throwable, Response] = {
-
-    val prefLength = rootPath.segments.length
-
     req match {
       case req if req.method == Method.GET =>
         val body           = KStream.empty[RIO[R, *], Bytes]
-        val korolevRequest = mkKorolevRequest(req, subPath(req.url.path, prefLength), body)
+        val korolevRequest = mkKorolevRequest(req, subPath, body)
         handleHttpResponse(korolevServer, korolevRequest)
 
       case req =>
         for {
           stream        <- toKorolevBody(req.body)
-          korolevRequest = mkKorolevRequest(req, subPath(req.url.path, prefLength), stream)
+          korolevRequest = mkKorolevRequest(req, subPath, stream)
           response      <- handleHttpResponse(korolevServer, korolevRequest)
         } yield {
           response
@@ -70,11 +65,11 @@ class ZioHttpKorolev[R] {
     }
   }
 
-  private def matchPrefix(prefix: Path, url: Path): Boolean =
-    url.segments.take(prefix.segments.length) == prefix.segments
-
-  private def subPath(path: Path, prefLength: Int): String =
-    path.copy(segments = path.segments.drop(prefLength)).encode
+  // Build a literal prefix codec so this Routes only matches under rootPath.
+  private def prefixCodec(prefix: Path): PathCodec[Unit] =
+    prefix.segments.foldLeft(PathCodec.empty: PathCodec[Unit]) { (codec, segment) =>
+      codec / PathCodec.literal(segment)
+    }
 
   private def containsUpgradeHeader(req: Request): Boolean = {
     val found = for {
@@ -107,7 +102,7 @@ class ZioHttpKorolev[R] {
                                      }
       route <- buildSocket(toClient, fromClientKQueue)
     } yield {
-      route.withHeader(Header.SecWebSocketProtocol(NonEmptyChunk(selectedProtocol)))
+      route.addHeader(Header.SecWebSocketProtocol(NonEmptyChunk(selectedProtocol)))
     }
   }
 
@@ -161,21 +156,26 @@ class ZioHttpKorolev[R] {
     korolevServer: KorolevService[RIO[R, *]],
     korolevRequest: KorolevHttpRequest[RIO[R, *]]
   ): ZIO[R, Throwable, Response] =
-    korolevServer.http(korolevRequest).flatMap { case KorolevResponse(status, stream, responseHeaders, _) =>
+    korolevServer.http(korolevRequest).flatMap { case KorolevResponse(status, stream, responseHeaders, contentLength) =>
       val headers = Headers(responseHeaders.map { case (name, value) => Header.Custom(name, value) })
-      val body: ZStream[R, Throwable, Byte] = stream.toZStream.flatMap { (bytes: Bytes) =>
-        ZStream.fromIterable(bytes.as[Array[Byte]])
-      }
+      val body: ZStream[R, Throwable, Byte] =
+        stream.toZStream.flatMap { (bytes: Bytes) =>
+          ZStream.fromIterable(bytes.as[Array[Byte]])
+        }
 
-      ZIO
-        .environmentWithZIO[R](env => ZIO.attempt(Body.fromStream(body.provideEnvironment(env))))
-        .map(body =>
-          Response(
-            status = HttpStatusConverter.fromKorolevStatus(status),
-            headers = headers,
-            body = body
-          )
+      val bodyZio =
+        contentLength match {
+          case Some(length) => Body.fromStreamEnv(body, length)
+          case None         => Body.fromStreamChunkedEnv(body)
+        }
+
+      bodyZio.map { body =>
+        Response(
+          status = HttpStatusConverter.fromKorolevStatus(status),
+          headers = headers,
+          body = body
         )
+      }
     }
 
   private def toKorolevBody(body: Body)(implicit eff: ZEffect): RIO[R, KStream[RIO[R, *], Bytes]] =

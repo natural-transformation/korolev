@@ -14,45 +14,50 @@ object DelayExample extends SimpleAkkaHttpKorolevApp {
   import levsha.dsl._
   import levsha.dsl.html._
 
+  private val resetAfterDelay =
+    Context.Delay[Future, Option[Int], Any](3.seconds, access =>
+      access.transition { case _ =>
+        None
+      }
+    )
+
+  val document: Render = {
+    case Some(n) =>
+      optimize {
+        Html(
+          body(
+            resetAfterDelay,
+            button(
+              "Push the button " + n,
+              event("click") { access =>
+                access.transition { case s =>
+                  s.map(_ + 1)
+                }
+              }
+            ),
+            "Wait 3 seconds!"
+          )
+        )
+      }
+    case None =>
+      optimize {
+        Html(
+          body(
+            button(
+              event("click") { access =>
+                access.transition(_ => Some(1))
+              },
+              "Push the button"
+            )
+          )
+        )
+      }
+  }
+
   val service = akkaHttpService {
     KorolevServiceConfig[Future, Option[Int], Any](
       stateLoader = StateLoader.default(Option.empty[Int]),
-      document = {
-        case Some(n) =>
-          optimize {
-            Html(
-              body(
-                delay(3.seconds) { access =>
-                  access.transition { case _ =>
-                    None
-                  }
-                },
-                button(
-                  "Push the button " + n,
-                  event("click") { access =>
-                    access.transition { case s =>
-                      s.map(_ + 1)
-                    }
-                  }
-                ),
-                "Wait 3 seconds!"
-              )
-            )
-          }
-        case None =>
-          optimize {
-            Html(
-              body(
-                button(
-                  event("click") { access =>
-                    access.transition(_ => Some(1))
-                  },
-                  "Push the button"
-                )
-              )
-            )
-          }
-      }
+      document = document
     )
   }
 }

@@ -42,7 +42,7 @@ object Reporter {
     final val Error   = Value(3, "Error")
   }
 
-  final object PrintReporter extends Reporter {
+  object PrintReporter extends Reporter {
 
     var level: Level.Value = Level.Debug
 

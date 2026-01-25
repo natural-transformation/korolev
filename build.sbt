@@ -15,9 +15,9 @@ val circeVersion = "0.14.1"
 val ce2Version   = "2.5.5"
 val ce3Version   = "3.3.12"
 
-val zioVersion     = "1.0.15"
-val zio2Version    = "2.0.0"
-val zioHttpVersion = "3.0.0-RC2"
+val zioVersion     = "1.0.18"
+val zio2Version    = "2.1.24"
+val zioHttpVersion = "3.8.0"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
@@ -28,7 +28,7 @@ scalaVersion := scala3Version
 
 def releaseVersion: String = sys.env.getOrElse("RELEASE_VERSION", "")
 def isRelease: Boolean     = releaseVersion != ""
-val BaseVersion            = "1.18.1"
+val BaseVersion            = "1.19.0"
 def publishVersion: String = if (isRelease) releaseVersion else s"$BaseVersion-SNAPSHOT"
 
 // Keep build-wide `version` in sync with the version we actually publish.

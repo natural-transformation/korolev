@@ -74,8 +74,14 @@ class WebSocketProtocolSpec extends AnyFlatSpec with Matchers {
 
   it should "process two frames sequentially" in {
     val bytes                                  = helloMaskedBytes ++ helloUnmaskedBytes
-    val (_, Decoder.Action.Fork(frame1, rest)) = decodeFrame(bytes)
-    val (_, Decoder.Action.Push(frame2))       = decodeFrame(rest)
+    val (frame1, rest) = decodeFrame(bytes) match {
+      case (_, Decoder.Action.Fork(frame, remaining)) => (frame, remaining)
+      case other                                      => fail(s"Unexpected decoder action: $other")
+    }
+    val frame2 = decodeFrame(rest) match {
+      case (_, Decoder.Action.Push(frame)) => frame
+      case other                           => fail(s"Unexpected decoder action: $other")
+    }
 
     frame1 shouldEqual helloFrame
     frame2 shouldEqual helloFrame
