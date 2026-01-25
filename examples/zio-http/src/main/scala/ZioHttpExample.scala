@@ -18,7 +18,7 @@ object ZioHttpExample extends ZIOAppDefault {
   import levsha.dsl.html._
   import scala.concurrent.duration._
 
-  private val ctx = Context[ZIO[Any, Throwable, *], Option[Int], Any]
+  val ctx = Context[ZIO[Any, Throwable, *], Option[Int], Any]
 
   import ctx._
 
@@ -83,7 +83,7 @@ object ZioHttpExample extends ZIOAppDefault {
       new Service().route()
     }
 
-  override def run =
+  override def run: ZIO[Any, Nothing, ZExitCode] =
     for {
       routes <- getAppRoute()
       _ <- Server
