@@ -1,15 +1,15 @@
 import xerial.sbt.Sonatype._
 
 val scala2_13Version = "2.13.18"
-val scala3Version    = "3.3.1"
+val scala3Version    = "3.3.7"
 
 val levshaVersion = "1.6.2"
 
 val akkaVersion     = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
-val pekkoVersion     = "1.0.0"
-val pekkoHttpVersion = "1.0.0"
+val pekkoVersion     = "1.4.0"
+val pekkoHttpVersion = "1.3.0"
 
 val circeVersion = "0.14.1"
 val ce2Version   = "2.5.5"
