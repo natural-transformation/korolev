@@ -85,24 +85,90 @@ case class Browser(
   ): F[Seq[Action[F, S, M]]] = {
 
     val rr = PseudoHtml.render(dom)
-    target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { target =>
-      val propagation = levsha.events.calculateEventPropagation(target, event)
 
-      // (continue propagation, list of batches of actions)
-      val (_, actions) = propagation.foldLeft((true, List.empty[F[Seq[Action[F, S, M]]]])) {
-        case (continue @ (false, _), _) => continue
-        case (continue @ (true, acc), eventId) =>
-          rr.events.get(eventId) match {
-            case None => continue
-            case Some(event) =>
-              val actionsF = access(state, event.effect, eventData, rr.elements)
-              (!event.stopPropagation, actionsF :: acc)
-          }
-      }
+    def collectActions(targetId: levsha.Id, eventType: String): F[Seq[Action[F, S, M]]] = {
+      val propagation = levsha.events.calculateEventPropagation(targetId, eventType)
 
       Effect[F]
-        .sequence(actions)
+        .sequence {
+          // (continue propagation, list of batches of actions)
+          val (_, actions) = propagation.foldLeft((true, List.empty[F[Seq[Action[F, S, M]]]])) {
+            case (continue @ (false, _), _) => continue
+            case (continue @ (true, acc), eventId) =>
+              rr.events.get(eventId) match {
+                case None => continue
+                case Some(event) =>
+                  val actionsF = access(state, event.effect, eventData, rr.elements)
+                  (!event.stopPropagation, actionsF :: acc)
+              }
+          }
+          actions
+        }
         .map(_.flatten)
+    }
+
+    def findElementPath(
+      node: PseudoHtml,
+      targetId: levsha.Id
+    ): Option[(PseudoHtml.Element, List[PseudoHtml.Element])] = {
+      def loop(
+        current: PseudoHtml,
+        parents: List[PseudoHtml.Element]
+      ): Option[(PseudoHtml.Element, List[PseudoHtml.Element])] = current match {
+        case element: PseudoHtml.Element =>
+          if (element.id == targetId) {
+            Some((element, parents))
+          } else {
+            element.children.foldLeft(Option.empty[(PseudoHtml.Element, List[PseudoHtml.Element])]) {
+              case (found @ Some(_), _) => found
+              case (None, child)        => loop(child, element :: parents)
+            }
+          }
+        case _ =>
+          None
+      }
+      loop(node, Nil)
+    }
+
+    def isSubmitButton(element: PseudoHtml.Element): Boolean = {
+      val tagName = element.tagName.toLowerCase
+      tagName match {
+        case "button" =>
+          element.attributes
+            .get("type")
+            .forall(t => t.toLowerCase != "button" && t.toLowerCase != "reset")
+        case "input" =>
+          element.attributes
+            .get("type")
+            .exists(_.toLowerCase == "submit")
+        case _ =>
+          false
+      }
+    }
+
+    def findSubmitForm(targetId: levsha.Id): Option[levsha.Id] =
+      findElementPath(rr.pseudoDom, targetId).flatMap { case (targetElement, parents) =>
+        if (isSubmitButton(targetElement)) {
+          parents.find(_.tagName == "form").map(_.id)
+        } else {
+          None
+        }
+      }
+
+    target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { targetId =>
+      val clickActionsF = collectActions(targetId, event)
+      if (event != "click") {
+        clickActionsF
+      } else {
+        findSubmitForm(targetId) match {
+          case None => clickActionsF
+          case Some(formId) =>
+            clickActionsF.flatMap { clickActions =>
+              // Emulate browser default: submit forms on submit button click.
+              collectActions(formId, "submit").map(clickActions ++ _)
+            }
+        }
+      }
     }
   }
 

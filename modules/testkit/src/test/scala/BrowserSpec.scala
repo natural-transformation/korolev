@@ -110,4 +110,35 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
         actions shouldEqual List(Action.Publish("hello world"))
       }
   }
+
+  it should "submit a form when clicking a submit button" in {
+    val context = Context[Future, String, Any]
+
+    import context._
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    def onSubmit(access: Access) =
+      access.publish("submitted")
+
+    val dom = form(
+      event("submit")(onSubmit),
+      button(
+        `type` := "submit",
+        name := "submit-button",
+        "Submit"
+      )
+    )
+
+    Browser()
+      .event(
+        state = "",
+        dom = dom,
+        event = "click",
+        target = _.byName("submit-button").headOption.map(_.id)
+      )
+      .map { actions =>
+        actions shouldEqual List(Action.Publish("submitted"))
+      }
+  }
 }
