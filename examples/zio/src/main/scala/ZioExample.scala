@@ -74,6 +74,6 @@ object ZioExample extends ZIOAppDefault {
     } yield ()
   }
 
-  final val run =
+  override final val run: ZIO[Any, Throwable, Unit] =
     app.provide(taskEffectLayer)
 }

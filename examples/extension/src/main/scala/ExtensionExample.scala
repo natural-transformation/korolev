@@ -18,7 +18,7 @@ object ExtensionExample extends SimpleAkkaHttpKorolevApp {
     .preMaterialize()
 
   private val topicListener = Extension.pure[Future, List[String], String] { access =>
-    val queueSink = queueSource.runWith(Sink.queue[String])
+    val queueSink = queueSource.runWith(Sink.queue[String]())
     def aux(): Future[Unit] = queueSink.pull() flatMap {
       case Some(message) =>
         access

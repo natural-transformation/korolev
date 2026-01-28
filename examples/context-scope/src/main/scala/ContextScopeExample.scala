@@ -16,8 +16,8 @@ object ContextScopeExample extends SimpleAkkaHttpKorolevApp {
   import levsha.dsl.html._
 
   final private val blogLens = Lens[ViewState, Blog](
-    read = { case ViewState(_, s: Blog) => s },
-    write = { case (orig, s) => orig.copy(tab = s) }
+    read = { case ViewState(_, blog: Blog) => blog },
+    write = { case (orig, blog) => orig.copy(tab = blog) }
   )
 
   final private val blogView = new BlogView(context.scope(blogLens))

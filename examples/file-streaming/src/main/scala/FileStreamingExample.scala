@@ -25,6 +25,12 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
 
   val fileInput = elementId()
 
+  // Use Delay binding explicitly to avoid deprecated delay helper.
+  private val aliveIndicatorTick =
+    Context.Delay[Task, State, Any](1.second, access =>
+      access.transition(state => state.copy(aliveIndicator = !state.aliveIndicator))
+    )
+
   def onUpload(access: Access): Task[Unit] =
     for {
       stream <- korolev.effect.Stream("hello", " ", "world").mat()
@@ -73,7 +79,7 @@ object FileStreamingExample extends SimpleAkkaHttpKorolevApp {
         optimize {
           Html(
             body(
-              delay(1.second)(access => access.transition(_.copy(aliveIndicator = !aliveIndicator))),
+              aliveIndicatorTick,
               div(when(aliveIndicator)(backgroundColor @= "red"), "Online"),
               input(`type` := "file", multiple, fileInput),
               ul(

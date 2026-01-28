@@ -3,7 +3,6 @@ import korolev.akka.*
 import korolev.server.*
 import korolev.state.javaSerialization.*
 import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
@@ -33,16 +32,16 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
             body(
               div("Super TODO tracker"),
               div(
-                state.todos.keys map { name =>
+                state.todos.keys map { tabName =>
                   a(
                     event("click") { access =>
-                      access.transition(_.copy(selectedTab = name))
+                      access.transition(_.copy(selectedTab = tabName))
                     },
-                    href := "/" + name.toLowerCase,
+                    href := "/" + tabName.toLowerCase,
                     preventDefaultClickBehavior,
                     marginLeft @= "10px",
-                    if (name == state.selectedTab) strong(name)
-                    else name
+                    if (tabName == state.selectedTab) strong(tabName)
+                    else tabName
                   )
                 }
               ),
@@ -96,9 +95,9 @@ object RoutingExample extends SimpleAkkaHttpKorolevApp {
         toState = {
           case Root =>
             initialState => Future.successful(initialState)
-          case Root / name if State.Tabs.exists(_.toLowerCase == name.toLowerCase) =>
+          case Root / tabName if State.Tabs.exists(_.toLowerCase == tabName.toLowerCase) =>
             initialState =>
-              val key = initialState.todos.keys.find(_.toLowerCase == name)
+              val key = initialState.todos.keys.find(_.toLowerCase == tabName)
               Future.successful(key.fold(initialState)(k => initialState.copy(selectedTab = k)))
         }
       ),

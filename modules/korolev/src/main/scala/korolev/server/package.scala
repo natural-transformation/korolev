@@ -90,19 +90,20 @@ package object server {
     implicit val exeContext: ExecutionContext = config.executionContext
 
     // TODO remove this when render/node fields will be removed
+    def legacyDocument(state: S) = {
+      import levsha.dsl._
+      import levsha.dsl.html._
+      optimize[Binding[F, S, M]] {
+        Html(
+          head(config.head(state)),
+          config.render(state)
+        )
+      }
+    }
+
     val actualConfig =
       if (config.document == null) {
-
-        config.copy(document = { (state: S) =>
-          import levsha.dsl._
-          import levsha.dsl.html._
-          optimize[Binding[F, S, M]] {
-            Html(
-              head(config.head(state)),
-              config.render(state)
-            )
-          }
-        })
+        config.copy(document = legacyDocument)
       } else {
         config
       }
@@ -112,7 +113,13 @@ package object server {
     val pageService     = new PageService[F, S, M](actualConfig)
     val sessionsService = new SessionsService[F, S, M](actualConfig, pageService)
     val messagingService =
-      new MessagingService[F](actualConfig.reporter, commonService, sessionsService, config.compressionSupport)
+      new MessagingService[F](
+        actualConfig.reporter,
+        commonService,
+        sessionsService,
+        config.compressionSupport,
+        actualConfig.sessionIdleTimeout
+      )
     val formDataCodec = new FormDataCodec
     val postService   = new PostService[F](actualConfig.reporter, sessionsService, commonService, formDataCodec)
     val ssrService    = new ServerSideRenderingService[F, S, M](sessionsService, pageService, actualConfig)

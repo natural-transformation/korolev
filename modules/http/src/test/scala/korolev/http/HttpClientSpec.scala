@@ -41,11 +41,12 @@ class HttpClientSpec extends AsyncFreeSpec {
     "should properly send GET requests over TLS" in {
       for {
         client             <- HttpClient.create[Future, Array[Byte]]()
-        response           <- client(Method.Get, URI.create("https://fomkin.org/hello.txt"), Seq.empty, None, Stream.empty)
+        // Use a stable public domain with a valid TLS certificate.
+        response           <- client(Method.Get, URI.create("https://example.com/"), Seq.empty, None, Stream.empty)
         strictResponseBody <- response.body.fold(Array.empty[Byte])(_ ++ _)
         utf8Body            = strictResponseBody.asUtf8String
       } yield {
-        assert(utf8Body.contains("Hello world") && response.status == Status.Ok)
+        assert(utf8Body.contains("Example Domain") && response.status == Status.Ok)
       }
     }
 

@@ -45,13 +45,17 @@ class AsyncResourcePool[F[_]: Effect, T: Close[F, *]](
             }
           } else {
             // Callback found. Transfer item to next taker.
-            val cb :: restOfCbs = ref.cbs
-            val newState        = ref.copy(cbs = restOfCbs)
-            if (pool.compareAndSet(ref, newState)) {
-              //reporter.debug("%s - Returned item transferred to next taker", name)
-              cb(Right(new BorrowImpl(value)))
-            } else {
-              loop(nanos)
+            ref.cbs match {
+              case cb :: restOfCbs =>
+                val newState = ref.copy(cbs = restOfCbs)
+                if (pool.compareAndSet(ref, newState)) {
+                  //reporter.debug("%s - Returned item transferred to next taker", name)
+                  cb(Right(new BorrowImpl(value)))
+                } else {
+                  loop(nanos)
+                }
+              case Nil =>
+                loop(nanos)
             }
           }
         }
@@ -141,6 +145,8 @@ class AsyncResourcePool[F[_]: Effect, T: Close[F, *]](
           } else {
             loop()
           }
+        case _ =>
+          loop()
       }
       loop()
     }

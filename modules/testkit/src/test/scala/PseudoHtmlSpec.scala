@@ -6,7 +6,6 @@ import org.scalatest.matchers.should.Matchers
 class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
 
   "PseudoDom.render" should "map levsha.Node to PseudoDom.Element" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div()
@@ -47,7 +46,6 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "map attributes well" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div(clazz := "foo bar", id := "baz")
@@ -64,7 +62,6 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "map styles well" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div(backgroundColor @= "red", border @= "1px")
