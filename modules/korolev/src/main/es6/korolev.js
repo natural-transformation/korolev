@@ -52,18 +52,45 @@ export class Korolev {
 
     this.listenRoot = (name, preventDefault) => {
       var listener = (event) => {
-        if (event.target.vId) {
-          if (preventDefault) {
-            event.preventDefault();
+        // Prefer composedPath() to handle Shadow DOM or extension-injected nodes.
+        // Fallback to walking up the parent chain.
+        let target = null;
+        const path =
+          (event.composedPath && event.composedPath()) ||
+          event.path ||
+          null;
+        if (path && path.length) {
+          for (let i = 0; i < path.length; i++) {
+            const node = path[i];
+            if (node && node.nodeType === 1 && node.vId) {
+              target = node;
+              break;
+            }
           }
-          let ecKey = eventCounterKey(event.target.vId, event.type);
+        } else {
+          let node = event.target;
+          while (node && (node.nodeType !== 1 || !node.vId)) {
+            node = node.parentNode;
+          }
+          target = node;
+        }
+        if (preventDefault) {
+          event.preventDefault();
+        }
+        if (target && target.vId) {
+          let ecKey = eventCounterKey(target.vId, event.type);
           let ec = this.eventCounters[ecKey] ?? 0;
           this.eventData[ecKey] = event;
-          this.callback(CallbackType.DOM_EVENT, ec + ':' + event.target.vId + ':' + event.type);
+          this.callback(CallbackType.DOM_EVENT, ec + ':' + target.vId + ':' + event.type);
         }
       };
-      this.root.addEventListener(name, listener);
-      this.rootListeners.push({ 'listener': listener, 'type': name });
+      // Attach to document to avoid missing bubbling events on <html>.
+      // Use capture for submit to handle browsers where submit doesn't bubble reliably.
+      let useCapture = name === 'submit';
+      let target = (document || this.root);
+      target.addEventListener(name, listener, useCapture);
+      // Track target and capture to remove the same listener on destroy.
+      this.rootListeners.push({ 'listener': listener, 'type': name, 'target': target, 'capture': useCapture });
     };
 
     this.listenRoot('submit', true);
@@ -92,7 +119,10 @@ export class Korolev {
 
   destroy() {
     // Remove root listeners
-    this.rootListeners.forEach((o) => this.root.removeEventListener(o.type, o.listener));
+    this.rootListeners.forEach((o) => {
+      let target = o.target || this.root;
+      target.removeEventListener(o.type, o.listener, o.capture);
+    });
     // Remove popstate handler
     window.removeEventListener('popstate', this.historyHandler);
     window.removeEventListener('resize', this.windowHandler);
@@ -117,7 +147,7 @@ export class Korolev {
 
   /** @param {?HTMLElement} rootNode */
   registerRoot(rootNode) {
-    if (!rootNode) return;
+    if (rootNode == null) return;
     let self = this;
     function aux(prefix, node) {
       var children = node.childNodes;
@@ -247,7 +277,23 @@ export class Korolev {
     */
   extractProperty(descriptor, id, propertyName) {
     let element = this.els[id];
-    let value = element[propertyName];
+    if (!element) {
+      this.callback(
+        CallbackType.EXTRACT_PROPERTY_RESPONSE,
+        `${descriptor}:${PropertyType.ERROR}:${id} is missing`
+      );
+      return;
+    }
+    let value;
+    try {
+      value = element[propertyName];
+    } catch (error) {
+      this.callback(
+        CallbackType.EXTRACT_PROPERTY_RESPONSE,
+        `${descriptor}:${PropertyType.ERROR}:${propertyName} threw`
+      );
+      return;
+    }
     var result, type;
     switch (typeof value) {
       case 'undefined':
@@ -506,6 +552,22 @@ export class Korolev {
   extractEventData(descriptor, id, type) {
     let data = this.eventData[eventCounterKey(id, type)];
     let result = {};
+    if (!data) {
+      this.callback(
+        CallbackType.EXTRACT_EVENT_DATA_RESPONSE,
+        `${descriptor}:${JSON.stringify(result)}`
+      );
+      return;
+    }
+    if (data && data.target) {
+      const target = data.target;
+      if (typeof target.value === 'string' || typeof target.value === 'number') {
+        result['targetValue'] = target.value;
+      }
+      if (typeof target.checked === 'boolean') {
+        result['targetChecked'] = target.checked;
+      }
+    }
     for (let propertyName in data) {
       let value = data[propertyName];
       switch (typeof value) {

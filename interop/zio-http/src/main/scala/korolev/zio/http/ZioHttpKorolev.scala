@@ -5,7 +5,7 @@ import _root_.zio.http.*
 import _root_.zio.http.codec.PathCodec
 import _root_.zio.stream.ZStream
 import korolev.data.{Bytes, BytesLike}
-import korolev.effect.{Queue, Stream as KStream}
+import korolev.effect.{Queue, Reporter, Stream as KStream}
 import korolev.server.{
   HttpRequest as KorolevHttpRequest,
   KorolevService,
@@ -34,7 +34,7 @@ class ZioHttpKorolev[R] {
     val handler = Handler.fromFunctionZIO[(Path, Request)] { case (path, req) =>
       val subPath = path.encode
       val response =
-        if (matchWebSocket(req)) routeWsRequest(req, subPath, korolevServer)
+        if (matchWebSocket(req)) routeWsRequest(req, subPath, korolevServer, config.reporter)
         else routeHttpRequest(subPath, req, korolevServer)
       response.mapError(Response.fromThrowable)
     }
@@ -79,57 +79,106 @@ class ZioHttpKorolev[R] {
     found.isDefined
   }
 
+  private[http] def parseProtocols(req: Request): Seq[String] =
+    parseProtocolsValues(req.headers.getAll(Header.SecWebSocketProtocol).map(_.renderedValue))
+
+  private[http] def parseProtocolsValues(values: Seq[String]): Seq[String] =
+    values
+      .flatMap(_.split(',').iterator.map(_.trim))
+      .filter(_.nonEmpty)
+
+  private val SupportedProtocols = Set("json", "json-deflate")
+
+  private[http] def acceptsProtocols(protocols: Seq[String]): Boolean =
+    protocols.exists(SupportedProtocols.contains)
+
   private def routeWsRequest[S: StateSerializer: StateDeserializer, M](
     req: Request,
     fullPath: String,
-    korolevServer: KorolevService[RIO[R, *]]
+    korolevServer: KorolevService[RIO[R, *]],
+    reporter: Reporter
   )(implicit eff: ZEffect): ZIO[R, Throwable, Response] = {
 
-    val fromClientKQueue          = Queue[RIO[R, *], Bytes]()
-    val korolevRequest            = mkKorolevRequest[KStream[RIO[R, *], Bytes]](req, fullPath, fromClientKQueue.stream)
-    val maybeSecWebSocketProtocol = req.headers.getAll(Header.SecWebSocketProtocol)
-    val protocols                 = maybeSecWebSocketProtocol.flatMap(_.renderedValue.split(',').map(_.trim))
-    for {
-      // FIXME https://github.com/zio/zio-http/issues/2278
-      response <- korolevServer.ws(WebSocketRequest(korolevRequest, Nil))
-      (selectedProtocol, toClient) = response match {
-                                       case WebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
-                                         selectedProtocol -> outStream
-                                           .map(out => WebSocketFrame.Binary(out.as[Chunk[Byte]]))
-                                           .toZStream
-                                       case null =>
-                                         throw new RuntimeException
-                                     }
-      route <- buildSocket(toClient, fromClientKQueue)
-    } yield {
-      route.addHeader(Header.SecWebSocketProtocol(NonEmptyChunk(selectedProtocol)))
+    val fromClientKQueue = Queue[RIO[R, *], Bytes]()
+    val korolevRequest =
+      mkKorolevRequest[KStream[RIO[R, *], Bytes]](req, fullPath, fromClientKQueue.stream)
+    val protocols = parseProtocols(req)
+    if (!acceptsProtocols(protocols)) {
+      ZIO.succeed(Response(status = Status.BadRequest))
+    } else {
+      for {
+        // FIXME https://github.com/zio/zio-http/issues/2278
+        response <- korolevServer.ws(WebSocketRequest(korolevRequest, protocols))
+        (selectedProtocol, toClient) = response match {
+                                         case WebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
+                                           selectedProtocol -> outStream
+                                             .map(out => WebSocketFrame.Binary(out.as[Chunk[Byte]]))
+                                             .toZStream
+                                         case null =>
+                                           throw new RuntimeException
+                                       }
+        route <- buildSocket(toClient, fromClientKQueue, reporter)
+      } yield {
+        route.addHeader(Header.SecWebSocketProtocol(NonEmptyChunk(selectedProtocol)))
+      }
     }
   }
 
   private def buildSocket(
     toClientStream: ZStream[R, Throwable, WebSocketFrame],
-    fromClientKQueue: Queue[RIO[R, *], Bytes]
+    fromClientKQueue: Queue[RIO[R, *], Bytes],
+    reporter: Reporter
   ): RIO[R, Response] = {
     val socket = Handler.webSocket { channel =>
-      channel.receiveAll {
-        case ChannelEvent.UserEventTriggered(ChannelEvent.UserEvent.HandshakeComplete) => {
-          toClientStream.mapZIO(frame => channel.send(ChannelEvent.Read(frame))).runDrain.forkDaemon
-        }
-        case ChannelEvent.Read(WebSocketFrame.Binary(bytes)) =>
-          fromClientKQueue.offer(Bytes.wrap(bytes))
-        case ChannelEvent.Read(WebSocketFrame.Text(t)) =>
-          fromClientKQueue.offer(BytesLike[Bytes].utf8(t))
-        case ChannelEvent.Read(WebSocketFrame.Close(_, _)) =>
-          fromClientKQueue.close()
-        case ChannelEvent.Unregistered =>
-          ZIO.unit
-        case frame =>
-          ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
-      }
+      runSocket(channel.send, channel.receiveAll, toClientStream, fromClientKQueue, reporter)
     }
 
     Response.fromSocketApp(socket)
   }
+
+  private[http] def runSocket(
+    send: ChannelEvent[WebSocketFrame] => RIO[R, Unit],
+    receiveAll: PartialFunction[ChannelEvent[WebSocketFrame], RIO[R, Unit]] => RIO[R, Unit],
+    toClientStream: ZStream[R, Throwable, WebSocketFrame],
+    fromClientKQueue: Queue[RIO[R, *], Bytes],
+    reporter: Reporter
+  ): RIO[R, Unit] =
+    for {
+      // Start sending immediately. zio-http 3.x may not emit HandshakeComplete reliably.
+      sendFiber <- toClientStream
+                     .mapZIO(frame => send(ChannelEvent.Read(frame)))
+                     .runDrain
+                     .catchAllCause { cause =>
+                       cause.failureOption.orElse(cause.dieOption) match {
+                         case Some(err) =>
+                           ZIO.succeed(reporter.error("WebSocket send failed", err))
+                         case None =>
+                           ZIO.unit
+                       }
+                     }
+                     .forkDaemon
+      _ <- receiveAll {
+             case ChannelEvent.UserEventTriggered(ChannelEvent.UserEvent.HandshakeComplete) =>
+              // No-op: we start sending immediately because this event is not reliable in zio-http 3.x.
+               ZIO.unit
+            case ChannelEvent.UserEventTriggered(ChannelEvent.UserEvent.HandshakeTimeout) =>
+              // Close the queue so sessions can clean up and fall back to long-polling.
+              fromClientKQueue.close()
+             case ChannelEvent.Read(WebSocketFrame.Binary(bytes)) =>
+               fromClientKQueue.offer(Bytes.wrap(bytes)).unit
+             case ChannelEvent.Read(WebSocketFrame.Text(t)) =>
+               fromClientKQueue.offer(BytesLike[Bytes].utf8(t)).unit
+             case ChannelEvent.Read(WebSocketFrame.Close(_, _)) =>
+               fromClientKQueue.close()
+            case ChannelEvent.ExceptionCaught(cause) =>
+              fromClientKQueue.close() *> ZIO.fail(cause)
+             case ChannelEvent.Unregistered =>
+              // Unregistered can happen without a close frame; close the queue to unblock cleanup.
+              fromClientKQueue.close()
+             case frame =>
+               ZIO.fail(new Exception(s"Invalid frame type ${frame.getClass.getName}"))
+           }.ensuring(sendFiber.interrupt)
+    } yield ()
 
   private def mkKorolevRequest[B](request: Request, path: String, body: B): KorolevRequest[B] = {
     val cookies = request.rawHeader(Header.Cookie)

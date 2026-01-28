@@ -1,7 +1,12 @@
 package korolev.zio.http
 
 import korolev.Context
+import java.util.concurrent.atomic.AtomicReference
+
+import korolev.data.Bytes
+import korolev.effect.{Queue, Reporter}
 import korolev.server.{KorolevServiceConfig, StateLoader}
+import korolev.server.internal.Cookies
 import korolev.state.javaSerialization.*
 import korolev.web.PathAndQuery
 import korolev.zio.Zio2Effect
@@ -10,7 +15,8 @@ import levsha.dsl.html.*
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import zio.http.*
-import zio.{Exit, RIO, Runtime, Task, Unsafe, ZIO}
+import zio.stream.ZStream
+import zio.{Chunk, Duration, Exit, NonEmptyChunk, Promise, RIO, Runtime, Unsafe, ZIO}
 
 import scala.concurrent.ExecutionContext
 
@@ -35,6 +41,18 @@ final class ZioHttpKorolevSpec extends AnyFlatSpec with Matchers {
   private val ctx = Context[ZIO[Any, Throwable, *], String, Any]
   import ctx.*
 
+  private val silentReporter: Reporter = new Reporter {
+    def error(message: String, cause: Throwable): Unit = ()
+    def error(message: String): Unit                   = ()
+    def warning(message: String, cause: Throwable): Unit = ()
+    def warning(message: String): Unit                   = ()
+    def info(message: String): Unit                      = ()
+    def debug(message: String): Unit                     = ()
+    def debug(message: String, arg1: Any): Unit          = ()
+    def debug(message: String, arg1: Any, arg2: Any): Unit = ()
+    def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = ()
+  }
+
   private val simpleDocument: ctx.Render = { state =>
     optimize {
       Html(
@@ -54,6 +72,21 @@ final class ZioHttpKorolevSpec extends AnyFlatSpec with Matchers {
     rootPath = PathAndQuery.Root,
     document = simpleDocument
   )
+
+  private val sessionIdRegex = "window\\['kfg'\\]=\\{sid:'([^']+)'".r
+
+  private def extractSessionId(html: String): Either[Throwable, String] =
+    sessionIdRegex
+      .findFirstMatchIn(html)
+      .map(_.group(1))
+      .toRight(new RuntimeException("Unable to find session id in HTML response"))
+
+  private def extractDeviceId(headers: Headers): Either[Throwable, String] =
+    headers
+      .getAll(Header.SetCookie)
+      .find(_.value.name == Cookies.DeviceId)
+      .map(_.value.content)
+      .toRight(new RuntimeException("Unable to find deviceId cookie in response headers"))
 
   "ZioHttpKorolev.service" should "create routes that serve the root page" in {
     val korolev = new ZioHttpKorolev[Any]
@@ -163,6 +196,252 @@ final class ZioHttpKorolevSpec extends AnyFlatSpec with Matchers {
         // mapError(Response.fromThrowable) is used - they should be converted
         // to InternalServerError responses
         fail(s"Error escaped as failure instead of being converted to 500 response: $cause")
+    }
+  }
+
+  it should "parse websocket subprotocol header values" in {
+    val korolev = new ZioHttpKorolev[Any]
+    korolev.parseProtocolsValues(Seq("json, json-deflate")) shouldBe Seq("json", "json-deflate")
+    korolev.parseProtocolsValues(Seq(" json ", "json-deflate", "  ")) shouldBe Seq("json", "json-deflate")
+  }
+
+  it should "return empty websocket protocols when none are provided" in {
+    val korolev = new ZioHttpKorolev[Any]
+    korolev.parseProtocolsValues(Nil) shouldBe empty
+  }
+
+  it should "accept only korolev websocket protocols" in {
+    val korolev = new ZioHttpKorolev[Any]
+    korolev.acceptsProtocols(Seq("json")) shouldBe true
+    korolev.acceptsProtocols(Seq("json-deflate")) shouldBe true
+    korolev.acceptsProtocols(Seq("json", "other")) shouldBe true
+    korolev.acceptsProtocols(Seq("other")) shouldBe false
+    korolev.acceptsProtocols(Nil) shouldBe false
+  }
+
+  it should "open a websocket using real session data" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val routes = korolev.service(simpleConfig)
+
+    val program = ZIO.scoped {
+      for {
+        port <- Server.install(routes)
+        baseUrl <- ZIO.fromEither(URL.decode(s"http://localhost:$port"))
+        response <- ZClient.batched(Request.get(baseUrl))
+        body <- response.body.asString
+        sessionId <- ZIO.fromEither(extractSessionId(body))
+        deviceId <- ZIO.fromEither(extractDeviceId(response.headers))
+        received <- Promise.make[Nothing, WebSocketFrame]
+        socketApp = Handler.webSocket { channel =>
+                      channel.receiveAll {
+                        case ChannelEvent.Read(frame) =>
+                          received.succeed(frame).unit *> channel.shutdown
+                        case _ =>
+                          ZIO.unit
+                      }
+                    }
+        headers = Headers(
+                    Header.Cookie(
+                      NonEmptyChunk(Cookie.Request(Cookies.DeviceId, deviceId))
+                    ),
+                    Header.SecWebSocketProtocol(NonEmptyChunk("json"))
+                  )
+        _ <- socketApp.connect(
+               s"ws://localhost:$port/bridge/web-socket/$sessionId",
+               headers
+             )
+        frame <- received.await.timeoutFail(new RuntimeException("Timed out waiting for websocket frame"))(
+                   Duration.fromSeconds(2)
+                 )
+      } yield frame
+    }.provide(
+      Client.default,
+      Server.defaultWith(_.onAnyOpenPort)
+    )
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    result match {
+      case Exit.Success(frame) =>
+        frame match {
+          case WebSocketFrame.Binary(bytes) =>
+            bytes.nonEmpty shouldBe true
+          case WebSocketFrame.Text(text) =>
+            text.nonEmpty shouldBe true
+          case other =>
+            fail(s"Unexpected websocket frame: $other")
+        }
+      case Exit.Failure(cause) =>
+        fail(s"WebSocket integration test failed: $cause")
+    }
+  }
+
+  it should "forward websocket frames to the Korolev queue" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val fromClientQueue = Queue[AppTask, Bytes]()
+    val toClientStream = ZStream.empty
+    val send = (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+    val receiveAll = (handler: PartialFunction[ChannelEvent[WebSocketFrame], AppTask[Unit]]) =>
+      handler.applyOrElse(
+        ChannelEvent.Read(WebSocketFrame.Text("client-msg")),
+        (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+      )
+
+    val program = for {
+      _ <- korolev.runSocket(send, receiveAll, toClientStream, fromClientQueue, silentReporter)
+      message <- fromClientQueue.stream.pull().flatMap {
+                   case Some(bytes) => ZIO.succeed(bytes)
+                   case None        => ZIO.fail(new RuntimeException("Expected message from websocket"))
+                 }.timeoutFail(new RuntimeException("Timed out waiting for message"))(Duration.fromSeconds(1))
+    } yield message.asUtf8String
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    result match {
+      case Exit.Success(text) =>
+        text shouldBe "client-msg"
+      case Exit.Failure(cause) =>
+        fail(s"WebSocket receive failed: $cause")
+    }
+  }
+
+  it should "close queue when websocket is unregistered" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val fromClientQueue = Queue[AppTask, Bytes]()
+    val toClientStream = ZStream.empty
+    val send = (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+    val receiveAll = (handler: PartialFunction[ChannelEvent[WebSocketFrame], AppTask[Unit]]) =>
+      handler.applyOrElse(ChannelEvent.Unregistered, (_: ChannelEvent[WebSocketFrame]) => ZIO.unit)
+
+    val program = for {
+      _ <- korolev.runSocket(send, receiveAll, toClientStream, fromClientQueue, silentReporter)
+      result <- fromClientQueue.stream.pull().timeoutFail(
+                  new RuntimeException("Timed out waiting for queue close")
+                )(Duration.fromSeconds(1))
+    } yield result
+
+    val outcome = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    outcome match {
+      case Exit.Success(value) =>
+        value shouldBe None
+      case Exit.Failure(cause) =>
+        fail(s"Queue did not close after unregistered: $cause")
+    }
+  }
+
+  it should "close queue when websocket handshake times out" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val fromClientQueue = Queue[AppTask, Bytes]()
+    val toClientStream = ZStream.empty
+    val send = (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+    val receiveAll = (handler: PartialFunction[ChannelEvent[WebSocketFrame], AppTask[Unit]]) =>
+      handler.applyOrElse(
+        ChannelEvent.UserEventTriggered(ChannelEvent.UserEvent.HandshakeTimeout),
+        (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+      )
+
+    val program = for {
+      _ <- korolev.runSocket(send, receiveAll, toClientStream, fromClientQueue, silentReporter)
+      result <- fromClientQueue.stream.pull().timeoutFail(
+                  new RuntimeException("Timed out waiting for queue close")
+                )(Duration.fromSeconds(1))
+    } yield result
+
+    val outcome = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    outcome match {
+      case Exit.Success(value) =>
+        value shouldBe None
+      case Exit.Failure(cause) =>
+        fail(s"Queue did not close after handshake timeout: $cause")
+    }
+  }
+
+  it should "report websocket send stream failures" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val errorRef = new AtomicReference[Option[Throwable]](None)
+    val reporter: Reporter = new Reporter {
+      def error(message: String, cause: Throwable): Unit = errorRef.set(Some(cause))
+      def error(message: String): Unit                   = errorRef.set(Some(new RuntimeException(message)))
+      def warning(message: String, cause: Throwable): Unit = ()
+      def warning(message: String): Unit                   = ()
+      def info(message: String): Unit                      = ()
+      def debug(message: String): Unit                     = ()
+      def debug(message: String, arg1: Any): Unit          = ()
+      def debug(message: String, arg1: Any, arg2: Any): Unit = ()
+      def debug(message: String, arg1: Any, arg2: Any, arg3: Any): Unit = ()
+    }
+
+    val fromClientQueue = Queue[AppTask, Bytes]()
+    val toClientStream = ZStream.fail(new RuntimeException("boom"))
+    val send = (_: ChannelEvent[WebSocketFrame]) => ZIO.unit
+    val receiveAll = (_: PartialFunction[ChannelEvent[WebSocketFrame], AppTask[Unit]]) =>
+      ZIO.never
+
+    val program = for {
+      fiber <- korolev.runSocket(send, receiveAll, toClientStream, fromClientQueue, reporter).fork
+      _ <- ZIO
+             .succeed(errorRef.get)
+             .repeatUntil(_.isDefined)
+             .timeoutFail(new RuntimeException("Timed out waiting for send failure log"))(
+               Duration.fromSeconds(1)
+             )
+      _ <- fiber.interrupt
+    } yield ()
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    result match {
+      case Exit.Success(_) =>
+        errorRef.get.map(_.getMessage) shouldBe Some("boom")
+      case Exit.Failure(cause) =>
+        fail(s"Send failure logging did not complete: $cause")
+    }
+  }
+
+  it should "send websocket output without waiting for handshake events" in {
+    val korolev = new ZioHttpKorolev[Any]
+    val program = for {
+      sentPromise <- Promise.make[Nothing, WebSocketFrame]
+      fromClientQueue = Queue[AppTask, Bytes]()
+      toClientStream = ZStream.succeed(WebSocketFrame.Text("hello"))
+      send = (event: ChannelEvent[WebSocketFrame]) =>
+        event match {
+          case ChannelEvent.Read(frame: WebSocketFrame) =>
+            sentPromise.succeed(frame).unit
+          case _ =>
+            ZIO.unit
+        }
+      receiveAll = (_: PartialFunction[ChannelEvent[WebSocketFrame], AppTask[Unit]]) =>
+        // Simulate missing handshake events by never emitting any receives.
+        ZIO.never
+      fiber <- korolev.runSocket(send, receiveAll, toClientStream, fromClientQueue, silentReporter).fork
+      frame <- sentPromise.await.timeoutFail(new RuntimeException("Timed out waiting for outbound frame"))(
+                 Duration.fromSeconds(1)
+               )
+      _ <- fiber.interrupt
+    } yield frame
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    result match {
+      case Exit.Success(frame) =>
+        frame shouldBe WebSocketFrame.Text("hello")
+      case Exit.Failure(cause) =>
+        fail(s"WebSocket output was not sent: $cause")
     }
   }
 }

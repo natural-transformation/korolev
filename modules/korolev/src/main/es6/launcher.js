@@ -21,7 +21,8 @@ window.document.addEventListener("DOMContentLoaded", () => {
   let connection = new Connection(
     config['sid'],
     config['r'],
-    window.location
+    window.location,
+    config
   );
 
   window['Korolev']['disconnect'] = (reconnect = false) => {
@@ -32,20 +33,17 @@ window.document.addEventListener("DOMContentLoaded", () => {
 
   connection.dispatcher.addEventListener('open', () => {
 
-    clw.hide();
     let bridge = new Bridge(config, connection);
     let globalObject = window['Korolev']
 
     globalObject['swapElementInRegistry'] = (a, b) => bridge._korolev.swapElementInRegistry(a, b);
     globalObject['element'] = (id) => bridge._korolev.element(id);
     globalObject['invokeCallback'] = (name, arg) => bridge._korolev.invokeCustomCallback(name, arg);
-    globalObject['ready'] = true;
-
-    window.dispatchEvent(new Event('KorolevReady'));
 
     let closeHandler = (event) => {
       bridge.destroy();
       clw.show();
+      globalObject['ready'] = false;
       connection
         .dispatcher
         .removeEventListener('close', closeHandler);
@@ -53,6 +51,12 @@ window.document.addEventListener("DOMContentLoaded", () => {
     connection
       .dispatcher
       .addEventListener('close', closeHandler);
+  });
+
+  connection.dispatcher.addEventListener('ready', () => {
+    clw.hide();
+    window['Korolev']['ready'] = true;
+    window.dispatchEvent(new Event('KorolevReady'));
   });
 
   connection.connect();

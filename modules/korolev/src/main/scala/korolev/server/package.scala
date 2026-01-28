@@ -113,7 +113,13 @@ package object server {
     val pageService     = new PageService[F, S, M](actualConfig)
     val sessionsService = new SessionsService[F, S, M](actualConfig, pageService)
     val messagingService =
-      new MessagingService[F](actualConfig.reporter, commonService, sessionsService, config.compressionSupport)
+      new MessagingService[F](
+        actualConfig.reporter,
+        commonService,
+        sessionsService,
+        config.compressionSupport,
+        actualConfig.sessionIdleTimeout
+      )
     val formDataCodec = new FormDataCodec
     val postService   = new PostService[F](actualConfig.reporter, sessionsService, commonService, formDataCodec)
     val ssrService    = new ServerSideRenderingService[F, S, M](sessionsService, pageService, actualConfig)
