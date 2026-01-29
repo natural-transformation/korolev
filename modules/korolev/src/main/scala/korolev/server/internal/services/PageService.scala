@@ -32,8 +32,9 @@ final class PageService[F[_]: Effect, S, M](config: KorolevServiceConfig[F, S, M
     }
     val presetIds = if (config.presetIds) ",kid:true" else ""
     val wsFlag = if (config.webSocketEnabled) "" else ",ws:false"
+    val wsProtocolsFlag = if (config.webSocketProtocolsEnabled) "" else ",wsp:false"
     val kfg =
-      s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds$wsFlag}"
+      s"window['kfg']={sid:'${qsid.sessionId}',r:'${(rp / "").mkString}',clw:'$clw',heartbeat:$heartbeat$presetIds$wsFlag$wsProtocolsFlag}"
 
     rc.openNode(XmlNs.html, "script")
     rc.addTextNode(kfg)

@@ -33,6 +33,7 @@ export class Connection {
     /** @type {?TextEncoder} */
     this._textEncoder = null;
     const wsEnabled = !(options && options['ws'] === false);
+    this._webSocketProtocolsEnabled = !(options && options['wsp'] === false);
     this._webSocketsSupported = wsEnabled && window.WebSocket !== undefined;
     this._connectionType = ConnectionType.LONG_POLLING;
     this._wasConnected = false;
@@ -88,16 +89,20 @@ export class Connection {
     let path = this._serverRootPath + `bridge/web-socket/${this._sessionId}`;
     let uri = url + path;
 
-    let protocols = [ 'json' ];
+    let protocols = null;
 
-    if (typeof CompressionStream != 'undefined') {
-      protocols.push('json-deflate');
+    // Some servers do not echo Sec-WebSocket-Protocol; allow disabling negotiation.
+    if (this._webSocketProtocolsEnabled) {
+      protocols = [ 'json' ];
+      if (typeof CompressionStream != 'undefined') {
+        protocols.push('json-deflate');
+      }
     }
 
     /** @type {Promise} */
     this._processing = null;
     this._textEncoder = new TextEncoder();
-    this._webSocket = new WebSocket(uri, protocols);
+    this._webSocket = protocols ? new WebSocket(uri, protocols) : new WebSocket(uri);
     this._webSocket.binaryType = 'blob';
     // Cache typed reference; protocol is negotiated once per connection.
     const webSocketWithProtocol = /** @type {{protocol: string}} */ (this._webSocket);

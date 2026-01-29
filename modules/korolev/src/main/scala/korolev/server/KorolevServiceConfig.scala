@@ -53,6 +53,7 @@ case class KorolevServiceConfig[F[_], S, M](
   heartbeatLimit: Option[Int] = Some(2),
   presetIds: Boolean = false,
   webSocketEnabled: Boolean = true,
+  webSocketProtocolsEnabled: Boolean = true,
   compressionSupport: Option[DeflateCompressionService[F]] =
     None // users should use java.util.zip.{Deflater, Inflater} in their service to make sure of the right compression format
 )(implicit val executionContext: ExecutionContext)
