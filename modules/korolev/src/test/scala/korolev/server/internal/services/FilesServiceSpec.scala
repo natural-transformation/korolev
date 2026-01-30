@@ -1,7 +1,6 @@
 package korolev.server.internal.services
 
 import korolev.effect.Effect
-import korolev.testExecution.defaultExecutor
 import korolev.web.{Headers, PathAndQuery}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers

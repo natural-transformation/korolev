@@ -8,11 +8,11 @@ import korolev.testExecution.defaultExecutor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 class PageServiceSpec extends AnyFlatSpec with Matchers {
 
-  private def mkConfig(protocolsEnabled: Boolean)(implicit ec: ExecutionContext) =
+  private def mkConfig(protocolsEnabled: Boolean) =
     KorolevServiceConfig[Future, Unit, Unit](
       stateLoader = StateLoader.default(()),
       webSocketProtocolsEnabled = protocolsEnabled
@@ -20,7 +20,6 @@ class PageServiceSpec extends AnyFlatSpec with Matchers {
 
   "appendScripts" should "include wsp flag when protocols are disabled" in {
     implicit val effect: Effect[Future] = Effect.futureEffect
-    implicit val ec: ExecutionContext = defaultExecutor
     val service = new PageService[Future, Unit, Unit](mkConfig(protocolsEnabled = false))
     val rc = new Html5RenderContext[Future, Unit, Unit](presetId = false)
 
@@ -31,7 +30,6 @@ class PageServiceSpec extends AnyFlatSpec with Matchers {
 
   it should "omit wsp flag when protocols are enabled" in {
     implicit val effect: Effect[Future] = Effect.futureEffect
-    implicit val ec: ExecutionContext = defaultExecutor
     val service = new PageService[Future, Unit, Unit](mkConfig(protocolsEnabled = true))
     val rc = new Html5RenderContext[Future, Unit, Unit](presetId = false)
 

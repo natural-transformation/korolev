@@ -3,7 +3,6 @@ package korolev.server.internal.services
 import korolev.Qsid
 import korolev.data.Bytes
 import korolev.effect.{Effect, Reporter, Stream}
-import korolev.testExecution.defaultExecutor
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 

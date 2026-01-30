@@ -11,13 +11,12 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.{Await, Future}
 
 class ExtractEventDataTimeoutSpec extends AnyFlatSpec with Matchers {
 
   "extractEventData" should "fail when client does not respond" in {
     implicit val effect: Effect[Future] = Effect.futureEffect
-    implicit val ec: ExecutionContext   = defaultExecutor
     implicit val reporter: Reporter = new Reporter {
       def error(message: String, cause: Throwable): Unit = ()
       def error(message: String): Unit                   = ()
@@ -41,7 +40,6 @@ class ExtractEventDataTimeoutSpec extends AnyFlatSpec with Matchers {
 
   it should "ignore late client responses after timeout" in {
     implicit val effect: Effect[Future] = Effect.futureEffect
-    implicit val ec: ExecutionContext   = defaultExecutor
     val errorRef                        = new AtomicReference[Option[Throwable]](None)
     val descriptorRef                   = new AtomicReference[Option[String]](None)
     implicit val reporter: Reporter = new Reporter {
