@@ -16,7 +16,6 @@
 
 package korolev.server.internal.services
 
-import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.StandardCharsets
 import java.util.zip.{Deflater, Inflater}
 import korolev.Qsid
@@ -136,7 +135,6 @@ private[korolev] final class MessagingService[F[_]: Effect](
   }
 
   private lazy val wsJsonDeflateEncoder = (message: String) => {
-    val encoder  = StandardCharsets.UTF_8.newEncoder()
     val deflater = deflaters.get()
 
     // Initialize input as a byte array from the string
@@ -153,7 +151,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
     val tempOutputArray = new Array[Byte](1024)
 
     // Initialize a ListBuffer to hold multiple output blocks
-    var outputBlocks = ListBuffer[Array[Byte]]()
+    val outputBlocks = ListBuffer[Array[Byte]]()
 
     // Deflate the input in chunks
     while (!deflater.finished()) {
@@ -298,6 +296,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
                      if (elapsed >= orphanTopicTimeout.toMillis) {
                        reporter.debug(s"Remove orphan long-polling topic for $qsid")
                        longPollingTopics.remove(qsid)
+                       ()
                      }
                    }
                  }
