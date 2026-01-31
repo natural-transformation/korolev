@@ -48,6 +48,8 @@
           # environment variables go here:
           # Set NIX_PATH to make sure the nix-build in `build.sh` produce the same results as `nix build`
           NIX_PATH = "nixpkgs=${inputs.nixpkgs}"; 
+          # Give sbt a larger heap to avoid OOM during Scala 3 compilation.
+          SBT_OPTS = "-Xms1g -Xmx4g -XX:MaxMetaspaceSize=1g";
         };
       };
      

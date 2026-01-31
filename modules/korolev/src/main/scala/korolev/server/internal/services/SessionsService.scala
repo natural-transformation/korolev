@@ -193,8 +193,14 @@ private[korolev] final class SessionsService[F[_]: Effect, S: StateSerializer: S
           .getFill(qsid)(create())
           .unit
       case false =>
-        // State is not exists. Do nothing
-        apps.remove(qsid)
+        // State can be missing after a restart; rebuild it from the request.
+        config.reporter.debug(s"State is missing for $qsid. Rebuilding from request.")
+        initAppState(qsid, rh)
+          .flatMap(_ => apps.getFill(qsid)(create()).unit)
+          .recover { case error =>
+            config.reporter.error(s"Unable to rebuild state for $qsid", error)
+            ()
+          }
     }
   }
 

@@ -266,7 +266,7 @@ final class ComponentInstance[
       rc,
       (proxy, misc) =>
         misc match {
-          case event: Event[F, CS, E] =>
+          case event: Event[F, CS, E] @unchecked =>
             val id  = rc.currentContainerId
             val eid = EventId(id, event.`type`, event.phase)
             val es  = events.getOrElseUpdate(eid, Vector.empty)
@@ -276,7 +276,7 @@ final class ComponentInstance[
             val id = rc.currentContainerId
             elements.put(element, id)
             ()
-          case delay: Delay[F, CS, E] =>
+          case delay: Delay[F, CS, E] @unchecked =>
             val id = rc.currentContainerId
             markedDelays += id
             if (!delays.contains(id)) {
@@ -284,7 +284,7 @@ final class ComponentInstance[
               delays.put(id, delayInstance)
               delayInstance.start(browserAccess)
             }
-          case entry: ComponentEntry[F, CS, E, Any, Any, Any] =>
+          case entry: ComponentEntry[F, CS, E, Any, Any, Any] @unchecked =>
             val id = rc.subsequentId
             nestedComponents.get(id) match {
               case Some(n: ComponentInstance[F, CS, E, Any, Any, Any]) if n.component.id == entry.component.id =>

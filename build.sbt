@@ -1,23 +1,23 @@
 import xerial.sbt.Sonatype._
 
-val scala2_13Version = "2.13.12"
-val scala3Version    = "3.3.1"
+val scala2_13Version = "2.13.18"
+val scala3Version    = "3.3.7"
 
 val levshaVersion = "1.6.2"
 
 val akkaVersion     = "2.6.19"
 val akkaHttpVersion = "10.2.9"
 
-val pekkoVersion     = "1.0.0"
-val pekkoHttpVersion = "1.0.0"
+val pekkoVersion     = "1.4.0"
+val pekkoHttpVersion = "1.3.0"
 
 val circeVersion = "0.14.1"
 val ce2Version   = "2.5.5"
 val ce3Version   = "3.3.12"
 
-val zioVersion     = "1.0.15"
-val zio2Version    = "2.0.0"
-val zioHttpVersion = "3.0.0-RC2"
+val zioVersion     = "1.0.18"
+val zio2Version    = "2.1.24"
+val zioHttpVersion = "3.8.0"
 
 val fs2ce2Version = "2.5.11"
 val fs2ce3Version = "3.2.8"
@@ -28,7 +28,7 @@ scalaVersion := scala3Version
 
 def releaseVersion: String = sys.env.getOrElse("RELEASE_VERSION", "")
 def isRelease: Boolean     = releaseVersion != ""
-val BaseVersion            = "1.18.1"
+val BaseVersion            = "1.19.0-local"
 def publishVersion: String = if (isRelease) releaseVersion else s"$BaseVersion-SNAPSHOT"
 
 // Keep build-wide `version` in sync with the version we actually publish.
@@ -188,7 +188,7 @@ val commonSettings = publishSettings ++ Seq(
       case Some((2, _)) =>
         Seq(
           compilerPlugin("com.olegpy"    %% "better-monadic-for" % "0.3.1"),
-          compilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.2" cross CrossVersion.full)
+          compilerPlugin("org.typelevel" %% "kind-projector"     % "0.13.4" cross CrossVersion.full)
         )
       case _ => Seq()
     }
@@ -356,9 +356,11 @@ lazy val pekko = project
   .settings(
     normalizedName := "korolev-pekko",
     libraryDependencies ++= Seq(
-      ("org.apache.pekko" %% "pekko-actor"  % pekkoVersion).cross(CrossVersion.for3Use2_13),
-      ("org.apache.pekko" %% "pekko-stream" % pekkoVersion).cross(CrossVersion.for3Use2_13),
-      ("org.apache.pekko" %% "pekko-http"   % pekkoHttpVersion).cross(CrossVersion.for3Use2_13)
+      ("org.apache.pekko" %% "pekko-actor"          % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream"         % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http"           % pekkoHttpVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream-testkit" % pekkoVersion     % Test).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http-testkit"   % pekkoHttpVersion % Test).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)

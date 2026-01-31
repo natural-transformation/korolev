@@ -41,6 +41,11 @@ package object pekko {
 
   import instances._
 
+  private val SupportedProtocols = Set("json", "json-deflate")
+
+  private[pekko] def acceptsProtocols(protocols: Seq[String]): Boolean =
+    protocols.exists(SupportedProtocols.contains)
+
   def pekkoHttpService[F[_]: Effect, S: StateSerializer: StateDeserializer, M](
     config: KorolevServiceConfig[F, S, M],
     wsLoggingEnabled: Boolean = false
@@ -67,63 +72,67 @@ package object pekko {
     extractRequest { request =>
       extractUnmatchedPath { path =>
         extractWebSocketUpgrade { upgrade =>
-          // inSink - consume messages from the client
-          // outSource - push messages to the client
-          val (inStream, inSink) = Sink.korolevStream[F, Bytes].preMaterialize()
-          val korolevRequest     = mkKorolevRequest(request, path.toString, inStream)
+          val requestedProtocols = upgrade.requestedProtocols
+          if (!acceptsProtocols(requestedProtocols)) {
+            // Reject non-Korolev WebSocket clients early for cost and security.
+            complete(HttpResponse(StatusCodes.BadRequest, entity = HttpEntity("Unsupported websocket subprotocol.")))
+          } else {
+            // inSink - consume messages from the client
+            // outSource - push messages to the client
+            val (inStream, inSink) = Sink.korolevStream[F, Bytes].preMaterialize()
+            val korolevRequest     = mkKorolevRequest(request, path.toString, inStream)
 
-          complete {
-            val korolevWsRequest = KorolevWebSocketRequest(korolevRequest, upgrade.requestedProtocols)
-            Effect[F]
-              .toFuture(korolevServer.ws(korolevWsRequest))
-              .map {
-                case KorolevWebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
-                  val source = outStream.asPekkoSource
-                    .map(text => BinaryMessage.Strict(text.as[ByteString]))
-                  val sink = Flow[Message]
-                    .mapAsync(pekkoHttpConfig.wsStreamedParallelism) {
-                      case TextMessage.Strict(message) =>
-                        Future.successful(Some(BytesLike[Bytes].utf8(message)))
-                      case TextMessage.Streamed(stream) =>
-                        stream
-                          .completionTimeout(pekkoHttpConfig.wsStreamedCompletionTimeout)
-                          .runFold("")(_ + _)
-                          .map(message => Some(BytesLike[Bytes].utf8(message)))
-                      case BinaryMessage.Strict(data) =>
-                        Future.successful(Some(Bytes.wrap(data)))
-                      case BinaryMessage.Streamed(stream) =>
-                        stream
-                          .completionTimeout(pekkoHttpConfig.wsStreamedCompletionTimeout)
-                          .runFold(ByteString.empty)(_ ++ _)
-                          .map(message => Some(Bytes.wrap(message)))
-                    }
-                    .recover { case ex =>
-                      korolevServiceConfig.reporter.error(
-                        s"WebSocket exception ${ex.getMessage}, shutdown output stream",
-                        ex
-                      )
-                      outStream.cancel()
-                      None
-                    }
-                    .collect { case Some(message) =>
-                      message
-                    }
-                    .to(inSink)
+            complete {
+              val korolevWsRequest = KorolevWebSocketRequest(korolevRequest, requestedProtocols)
+              Effect[F]
+                .toFuture(korolevServer.ws(korolevWsRequest))
+                .map {
+                  case KorolevWebSocketResponse(KorolevResponse(_, outStream, _, _), selectedProtocol) =>
+                    val source = outStream.asPekkoSource
+                      .map(text => BinaryMessage.Strict(text.as[ByteString]))
+                    val sink = Flow[Message]
+                      .mapAsync(pekkoHttpConfig.wsStreamedParallelism) {
+                        case TextMessage.Strict(message) =>
+                          Future.successful(Some(BytesLike[Bytes].utf8(message)))
+                        case TextMessage.Streamed(stream) =>
+                          stream
+                            .completionTimeout(pekkoHttpConfig.wsStreamedCompletionTimeout)
+                            .runFold("")(_ + _)
+                            .map(message => Some(BytesLike[Bytes].utf8(message)))
+                        case BinaryMessage.Strict(data) =>
+                          Future.successful(Some(Bytes.wrap(data)))
+                        case BinaryMessage.Streamed(stream) =>
+                          stream
+                            .completionTimeout(pekkoHttpConfig.wsStreamedCompletionTimeout)
+                            .runFold(ByteString.empty)(_ ++ _)
+                            .map(message => Some(Bytes.wrap(message)))
+                      }
+                      .recover { case ex =>
+                        korolevServiceConfig.reporter.error(
+                          s"WebSocket exception ${ex.getMessage}, shutdown output stream",
+                          ex
+                        )
+                        outStream.cancel()
+                        None
+                      }
+                      .collect { case Some(message) =>
+                        message
+                      }
+                      .to(inSink)
 
-                  upgrade.handleMessages(
-                    if (wsLoggingEnabled) {
-                      Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
-                    } else {
-                      Flow.fromSinkAndSourceCoupled(sink, source)
-                    },
-                    Some(selectedProtocol)
-                  )
-                case _ =>
-                  throw new RuntimeException // cannot happen
-              }
-              .recover { case BadRequestException(message) =>
-                HttpResponse(StatusCodes.BadRequest, entity = HttpEntity(message))
-              }
+                    upgrade.handleMessages(
+                      if (wsLoggingEnabled) {
+                        Flow.fromSinkAndSourceCoupled(sink, source).log("korolev-ws")
+                      } else {
+                        Flow.fromSinkAndSourceCoupled(sink, source)
+                      },
+                      Some(selectedProtocol)
+                    )
+                }
+                .recover { case BadRequestException(message) =>
+                  HttpResponse(StatusCodes.BadRequest, entity = HttpEntity(message))
+                }
+            }
           }
         }
       }
@@ -193,7 +202,7 @@ package object pekko {
       }
     }
     val (contentTypeHeaders, otherHeaders) = headers.partition(_.lowercaseName() == "content-type")
-    val contentTypeOpt                     = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).right.toOption)
+    val contentTypeOpt                     = contentTypeHeaders.headOption.flatMap(h => ContentType.parse(h.value()).toOption)
     (contentTypeOpt, otherHeaders.toList)
   }
 }

@@ -17,8 +17,9 @@ export class Connection {
    * @param {string} sessionId
    * @param {string} serverRootPath
    * @param {Location} location
+   * @param {Object} [options]
    */
-  constructor(sessionId, serverRootPath, location) {
+  constructor(sessionId, serverRootPath, location, options) {
     this._reconnect = true;
     this._sessionId = sessionId;
     this._serverRootPath = serverRootPath;
@@ -31,9 +32,12 @@ export class Connection {
     this._webSocket = null;
     /** @type {?TextEncoder} */
     this._textEncoder = null;
-    this._webSocketsSupported = window.WebSocket !== undefined;
+    const wsEnabled = !(options && options['ws'] === false);
+    this._webSocketProtocolsEnabled = !(options && options['wsp'] === false);
+    this._webSocketsSupported = wsEnabled && window.WebSocket !== undefined;
     this._connectionType = ConnectionType.LONG_POLLING;
     this._wasConnected = false;
+    this._wasReady = false;
 
     /** @type {?ConnectionType} */
     this._selectedConnectionType = null;
@@ -85,21 +89,27 @@ export class Connection {
     let path = this._serverRootPath + `bridge/web-socket/${this._sessionId}`;
     let uri = url + path;
 
-    let protocols = [ 'json' ];
+    let protocols = null;
 
-    if (typeof CompressionStream != 'undefined') {
-      protocols.push('json-deflate');
+    // Some servers do not echo Sec-WebSocket-Protocol; allow disabling negotiation.
+    if (this._webSocketProtocolsEnabled) {
+      protocols = [ 'json' ];
+      if (typeof CompressionStream != 'undefined') {
+        protocols.push('json-deflate');
+      }
     }
 
     /** @type {Promise} */
     this._processing = null;
     this._textEncoder = new TextEncoder();
-    this._webSocket = new WebSocket(uri, protocols);
+    this._webSocket = protocols ? new WebSocket(uri, protocols) : new WebSocket(uri);
     this._webSocket.binaryType = 'blob';
+    // Cache typed reference; protocol is negotiated once per connection.
+    const webSocketWithProtocol = /** @type {{protocol: string}} */ (this._webSocket);
     this._send = async (message) => {
       let blob = new Blob([this._textEncoder.encode(message)]);
-      if (this._webSocket.protocol == 'json-deflate') {
-        let stream = blob
+      if (webSocketWithProtocol.protocol == 'json-deflate') {
+        let stream = /** @type {{stream: function(): *}} */ (blob)
           .stream()
           .pipeThrough(new CompressionStream('deflate-raw'))
         blob = await new Response(stream).blob();
@@ -114,8 +124,8 @@ export class Connection {
 
     let processMessage = async (data) => {
       if (data instanceof Blob) {
-        if (this._webSocket.protocol == 'json-deflate') {
-          let stream = data
+        if (webSocketWithProtocol.protocol == 'json-deflate') {
+          let stream = /** @type {{stream: function(): *}} */ (data)
             .stream()
             .pipeThrough(new DecompressionStream('deflate-raw'));
           data = await new Response(stream).blob();
@@ -128,13 +138,16 @@ export class Connection {
         } else {
           let reader = new FileReader();
           reader.onload = async () => {
-            data = reader.result;
-            this._onMessage(data);
+            const text = /** @type {string} */ (reader.result);
+            this._onMessage(text);
           }
           reader.readAsText(data);
         }
+      } else if (data instanceof ArrayBuffer) {
+        const decoder = typeof TextDecoder === 'undefined' ? null : new TextDecoder();
+        this._onMessage(decoder ? decoder.decode(new Uint8Array(data)) : String(data));
       } else {
-        this._onMessage(data);
+        this._onMessage(String(data));
       }
     }
 
@@ -180,6 +193,7 @@ export class Connection {
           case 200:
             if (firstTime)
               this._onOpen();
+            this._onReady();
             this._onMessage(request.responseText);
           case 503:
             // Poll again
@@ -225,16 +239,35 @@ export class Connection {
     this._send = publish;
 
     subscribe(true);
+    // Treat long-polling as connected immediately so Korolev can attach listeners
+    // before the first subscribe response arrives.
+    this._onOpen();
     console.log(`Trying to open connection to ${uriPrefix} using long polling`);
   }
 
   /** @private */
   _onOpen() {
     console.log("Connection opened");
+    if (this._wasConnected) {
+      return;
+    }
     let event = this._createEvent('open');
     this._wasConnected = true;
     this._reconnectTimeout = MIN_RECONNECT_TIMEOUT;
     this._selectedConnectionType = this._connectionType;
+    this._dispatcher.dispatchEvent(event);
+    if (this._connectionType !== ConnectionType.LONG_POLLING) {
+      this._onReady();
+    }
+  }
+
+  /** @private */
+  _onReady() {
+    if (this._wasReady) {
+      return;
+    }
+    let event = this._createEvent('ready');
+    this._wasReady = true;
     this._dispatcher.dispatchEvent(event);
   }
 
@@ -253,6 +286,9 @@ export class Connection {
       await this._processing;
     }
 
+    // Allow reconnect to re-emit open and reinitialize the bridge.
+    this._wasConnected = false;
+    this._wasReady = false;
     let event = this._createEvent('close');
     this._dispatcher.dispatchEvent(event);
     if (this._reconnect) {
