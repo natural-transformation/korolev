@@ -587,4 +587,87 @@ final class ZioHttpKorolevSpec extends AnyFlatSpec with Matchers {
         fail(s"WebSocket without protocol negotiation failed: $cause")
     }
   }
+
+  // ============================================================================
+  // WebSocket Integration Tests
+  // These tests verify that WebSocket connections work end-to-end
+  // ============================================================================
+
+  it should "receive server frames and send client response via WebSocket" in {
+    // Use webSocketProtocolsEnabled = false for simpler test (no protocol negotiation)
+    val config = simpleConfig.copy(webSocketProtocolsEnabled = false)
+    val korolev = new ZioHttpKorolev[Any]
+    val routes = korolev.service(config)
+
+    val program = ZIO.scoped {
+      for {
+        port <- Server.install(routes)
+        baseUrl <- ZIO.fromEither(URL.decode(s"http://localhost:$port"))
+
+        // Get the initial page to establish a session
+        response <- ZClient.batched(Request.get(baseUrl))
+        body <- response.body.asString
+        sessionId <- ZIO.fromEither(extractSessionId(body))
+        deviceId <- ZIO.fromEither(extractDeviceId(response.headers))
+
+        // Connect and verify we receive a frame, then send one back
+        receivedFrame <- Promise.make[Nothing, WebSocketFrame]
+        sentSuccess <- Promise.make[Nothing, Boolean]
+
+        socketApp = Handler.webSocket { channel =>
+                      channel.receiveAll {
+                        case ChannelEvent.Read(frame) =>
+                          for {
+                            _ <- receivedFrame.succeed(frame).unit
+                            // Send a heartbeat callback to confirm bidirectional communication
+                            // Format: JSON array [CallbackType] where CallbackType.Heartbeat = 6
+                            sendResult <- channel.send(ChannelEvent.Read(WebSocketFrame.Text("[6]"))).either
+                            _ <- sentSuccess.succeed(sendResult.isRight).unit
+                            _ <- channel.shutdown
+                          } yield ()
+                        case _ =>
+                          ZIO.unit
+                      }
+                    }
+
+        headers = Headers(
+                    Header.Cookie(NonEmptyChunk(Cookie.Request(Cookies.DeviceId, deviceId)))
+                  )
+
+        // Connect - blocks until shutdown
+        _ <- socketApp.connect(s"ws://localhost:$port/bridge/web-socket/$sessionId", headers)
+
+        // Get results (with timeout to prevent test hanging)
+        frame <- receivedFrame.await.timeoutFail(new RuntimeException("Timed out waiting for frame"))(
+                   Duration.fromSeconds(2)
+                 )
+        didSend <- sentSuccess.await.timeoutFail(new RuntimeException("Timed out waiting for send"))(
+                     Duration.fromSeconds(2)
+                   )
+      } yield (frame, didSend)
+    }.provide(
+      Client.default,
+      Server.defaultWith(_.onAnyOpenPort)
+    )
+
+    val result = Unsafe.unsafe { implicit unsafe =>
+      runtime.unsafe.run(program)
+    }
+
+    result match {
+      case Exit.Success((frame, didSend)) =>
+        // Verify we received a server message
+        frame match {
+          case WebSocketFrame.Binary(bytes) => bytes.nonEmpty shouldBe true
+          case WebSocketFrame.Text(text)    => text.nonEmpty shouldBe true
+          case other                        => fail(s"Unexpected frame type: $other")
+        }
+        // Verify we successfully sent a message back
+        didSend shouldBe true
+
+      case Exit.Failure(cause) =>
+        fail(s"Bidirectional WebSocket test failed: $cause")
+    }
+  }
+
 }

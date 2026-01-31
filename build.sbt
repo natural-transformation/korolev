@@ -28,7 +28,7 @@ scalaVersion := scala3Version
 
 def releaseVersion: String = sys.env.getOrElse("RELEASE_VERSION", "")
 def isRelease: Boolean     = releaseVersion != ""
-val BaseVersion            = "1.19.0"
+val BaseVersion            = "1.19.0-local"
 def publishVersion: String = if (isRelease) releaseVersion else s"$BaseVersion-SNAPSHOT"
 
 // Keep build-wide `version` in sync with the version we actually publish.
@@ -356,9 +356,11 @@ lazy val pekko = project
   .settings(
     normalizedName := "korolev-pekko",
     libraryDependencies ++= Seq(
-      ("org.apache.pekko" %% "pekko-actor"  % pekkoVersion).cross(CrossVersion.for3Use2_13),
-      ("org.apache.pekko" %% "pekko-stream" % pekkoVersion).cross(CrossVersion.for3Use2_13),
-      ("org.apache.pekko" %% "pekko-http"   % pekkoHttpVersion).cross(CrossVersion.for3Use2_13)
+      ("org.apache.pekko" %% "pekko-actor"          % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream"         % pekkoVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http"           % pekkoHttpVersion).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-stream-testkit" % pekkoVersion     % Test).cross(CrossVersion.for3Use2_13),
+      ("org.apache.pekko" %% "pekko-http-testkit"   % pekkoHttpVersion % Test).cross(CrossVersion.for3Use2_13)
     )
   )
   .dependsOn(korolev)
