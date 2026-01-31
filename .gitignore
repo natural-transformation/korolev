@@ -19,3 +19,8 @@ target/
 
 examples/**/*.nix
 result*
+
+# AI tools
+.claude
+.cursor
+CLAUDE.md
