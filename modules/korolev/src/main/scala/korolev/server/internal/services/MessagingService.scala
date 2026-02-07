@@ -16,12 +16,11 @@
 
 package korolev.server.internal.services
 
-import java.nio.{ByteBuffer, CharBuffer}
 import java.nio.charset.StandardCharsets
 import java.util.zip.{Deflater, Inflater}
 import korolev.Qsid
 import korolev.data.{Bytes, BytesLike}
-import korolev.effect.{Effect, Queue, Reporter, Stream}
+import korolev.effect.{Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax.*
 import korolev.internal.Frontend
 import korolev.server.{HttpResponse, WebSocketResponse}
@@ -29,22 +28,45 @@ import korolev.server.DeflateCompressionService
 import korolev.web.Request.Head
 import korolev.web.Response
 import korolev.web.Response.Status
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import scala.collection.concurrent.TrieMap
 import scala.collection.mutable.ListBuffer
+import scala.concurrent.duration.FiniteDuration
 
 private[korolev] final class MessagingService[F[_]: Effect](
   reporter: Reporter,
   commonService: CommonService[F],
   sessionsService: SessionsService[F, _, _],
-  compressionSupport: Option[DeflateCompressionService[F]]
+  compressionSupport: Option[DeflateCompressionService[F]],
+  orphanTopicTimeout: FiniteDuration
 ) {
 
   import MessagingService._
 
+  private final case class TopicEntry(
+    queue: Queue[F, String],
+    subscribed: AtomicBoolean,
+    lastActivityMillis: AtomicLong,
+    orphanCleanup: AtomicReference[Option[Scheduler.JobHandler[F, Unit]]]
+  )
+
+  private val scheduler = Scheduler[F]
+  private def runAsyncForget(effect: F[Unit]): Unit =
+    Effect[F].runAsync(effect) {
+      case Left(err) => reporter.error("Unhandled error", err)
+      case Right(_)  => ()
+    }
+
   /**
    * Poll message from session's ongoing queue.
    */
+  private def messageCode(message: String): String =
+    message
+      .dropWhile(_ == '[')
+      .takeWhile(ch => ch != ',' && ch != ']' && !ch.isWhitespace)
+
   def longPollingSubscribe(qsid: Qsid, rh: Head): F[HttpResponse[F]] =
+
     for {
       _        <- sessionsService.createAppIfNeeded(qsid, rh, createTopic(qsid))
       maybeApp <- sessionsService.getApp(qsid)
@@ -53,6 +75,11 @@ private[korolev] final class MessagingService[F[_]: Effect](
       response <- maybeMessage match {
                     case None => Effect[F].pure(commonGoneResponse)
                     case Some(message) =>
+                      Effect[F].delay {
+                        reporter.debug(
+                          s"Long-polling send to $qsid: code=${messageCode(message)} length=${message.length}"
+                        )
+                      } *>
                       HttpResponse(
                         status = Response.Status.Ok,
             text = message,
@@ -68,9 +95,15 @@ private[korolev] final class MessagingService[F[_]: Effect](
    */
   def longPollingPublish(qsid: Qsid, data: Stream[F, Bytes]): F[HttpResponse[F]] =
     for {
-      topic   <- takeTopic(qsid)
+      entry   <- Effect[F].delay(getOrCreateTopicUnsafe(qsid))
+      _       <- scheduleOrphanCleanup(qsid, entry)
       message <- data.fold(Bytes.empty)(_ ++ _).map(_.asUtf8String)
-      _       <- topic.enqueue(message)
+      _ <- Effect[F].delay {
+             reporter.debug(
+               s"Long-polling publish received for $qsid: code=${messageCode(message)} length=${message.length}"
+             )
+           }
+      _ <- entry.queue.enqueue(message)
     } yield commonOkResponse
 
   private lazy val inflaters = ThreadLocal.withInitial(() => new Inflater(true))
@@ -102,7 +135,6 @@ private[korolev] final class MessagingService[F[_]: Effect](
   }
 
   private lazy val wsJsonDeflateEncoder = (message: String) => {
-    val encoder  = StandardCharsets.UTF_8.newEncoder()
     val deflater = deflaters.get()
 
     // Initialize input as a byte array from the string
@@ -119,7 +151,7 @@ private[korolev] final class MessagingService[F[_]: Effect](
     val tempOutputArray = new Array[Byte](1024)
 
     // Initialize a ListBuffer to hold multiple output blocks
-    var outputBlocks = ListBuffer[Array[Byte]]()
+    val outputBlocks = ListBuffer[Array[Byte]]()
 
     // Deflate the input in chunks
     while (!deflater.finished()) {
@@ -179,7 +211,10 @@ private[korolev] final class MessagingService[F[_]: Effect](
    * Sessions created via long polling subscription takes messages from topics
    * stored in this table.
    */
-  private val longPollingTopics = TrieMap.empty[Qsid, Queue[F, String]]
+  private val longPollingTopics = TrieMap.empty[Qsid, TopicEntry]
+
+  private[services] def topicExists(qsid: Qsid): Boolean =
+    longPollingTopics.contains(qsid)
 
   /**
    * Same headers in all responses
@@ -210,18 +245,65 @@ private[korolev] final class MessagingService[F[_]: Effect](
     contentLength = Some(0L)
   )
 
-  private def takeTopic(qsid: Qsid) =
-    Effect[F].delay {
-      if (longPollingTopics.contains(qsid)) longPollingTopics(qsid)
-      else throw new Exception(s"There is no long-polling topic matching $qsid")
+  private def getOrCreateTopicUnsafe(qsid: Qsid): TopicEntry =
+    longPollingTopics.get(qsid) match {
+      case Some(existing) =>
+        existing
+      case None =>
+        val entry = TopicEntry(
+          queue = Queue[F, String](),
+          subscribed = new AtomicBoolean(false),
+          lastActivityMillis = new AtomicLong(System.currentTimeMillis()),
+          orphanCleanup = new AtomicReference(None)
+        )
+        longPollingTopics.putIfAbsent(qsid, entry) match {
+          case Some(existing) =>
+            existing
+          case None =>
+            reporter.debug(s"Create long-polling topic for $qsid")
+            entry.queue.cancelSignal.runAsync(_ => longPollingTopics.remove(qsid))
+            entry
+        }
     }
 
-  private def createTopic(qsid: Qsid) = {
-    reporter.debug(s"Create long-polling topic for $qsid")
-    val topic = Queue[F, String]()
-    topic.cancelSignal.runAsync(_ => longPollingTopics.remove(qsid))
-    longPollingTopics.putIfAbsent(qsid, topic)
-    topic.stream
+  private[services] def createTopic(qsid: Qsid): Stream[F, String] = {
+    val entry = getOrCreateTopicUnsafe(qsid)
+    if (entry.subscribed.compareAndSet(false, true)) {
+      runAsyncForget(cancelOrphanCleanup(entry))
+    }
+    entry.queue.stream
+  }
+
+  private def cancelOrphanCleanup(entry: TopicEntry): F[Unit] =
+    Effect[F].delay(entry.orphanCleanup.getAndSet(None)).flatMap {
+      case Some(job) => job.cancel()
+      case None      => Effect[F].unit
+    }
+
+  private def scheduleOrphanCleanup(qsid: Qsid, entry: TopicEntry): F[Unit] = {
+    if (entry.subscribed.get()) {
+      Effect[F].unit
+    } else if (orphanTopicTimeout.toMillis <= 0) {
+      Effect[F].unit
+    } else {
+      for {
+        _   <- cancelOrphanCleanup(entry)
+        _   <- Effect[F].delay(entry.lastActivityMillis.set(System.currentTimeMillis()))
+        job <- scheduler.scheduleOnce(orphanTopicTimeout) {
+                 Effect[F].delay {
+                   if (!entry.subscribed.get()) {
+                     val elapsed = System.currentTimeMillis() - entry.lastActivityMillis.get()
+                     if (elapsed >= orphanTopicTimeout.toMillis) {
+                       reporter.debug(s"Remove orphan long-polling topic for $qsid")
+                       longPollingTopics.remove(qsid)
+                       ()
+                     }
+                   }
+                 }
+               }
+        _ <- Effect[F].delay(entry.orphanCleanup.set(Some(job)))
+      } yield ()
+    }
   }
 }
 

@@ -21,7 +21,7 @@ import korolev.Context.FileHandler
 import korolev.Metrics
 import korolev.Metrics
 import korolev.data.Bytes
-import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Stream}
+import korolev.effect.{AsyncTable, Effect, Queue, Reporter, Scheduler, Stream}
 import korolev.effect.syntax._
 import korolev.web.{FormData, PathAndQuery}
 import levsha.Id
@@ -30,6 +30,7 @@ import levsha.impl.DiffRenderContext.ChangesPerformer
 import scala.annotation.switch
 import scala.collection.mutable
 import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 /**
  * Typed interface to client side
@@ -44,6 +45,7 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   private val lastDescriptor            = new AtomicInteger(0)
   private val avgDiffTime               = new AtomicLong(0)
   private val remoteDomChangesPerformer = new RemoteDomChangesPerformer()
+  private val scheduler                 = Scheduler[F]
 
   private val customCallbacks  = mutable.Map.empty[String, String => F[Unit]]
   private val downloadFiles    = mutable.Map.empty[String, DownloadFileMeta[F]]
@@ -140,12 +142,48 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   private def nextDescriptor() =
     Effect[F].delay(lastDescriptor.getAndIncrement().toString)
 
+  private def getStringPromise(descriptor: String): F[String] =
+    stringPromises
+      .get(descriptor)
+      .flatMap(value => stringPromises.remove(descriptor).as(value))
+      .recoverF { case error =>
+        stringPromises.remove(descriptor).after(Effect[F].fail(error))
+      }
+
   def extractProperty(id: Id, name: String): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _          <- send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
-      result     <- stringPromises.get(descriptor)
+      _ <- Effect[F].delay {
+             reporter.debug(s"ExtractProperty request: id=${id.mkString} name=$name descriptor=$descriptor")
+           }
+      _      <- send(Procedure.ExtractProperty.code, descriptor, id.mkString, name)
+      // Avoid hanging forever if the client never replies.
+      timeout <- scheduleExtractPropertyTimeout(descriptor)
+      result  <- getStringPromise(descriptor)
+      _       <- timeout.fold(Effect[F].unit)(_.cancel())
+      _ <- Effect[F].delay {
+             reporter.debug(s"ExtractProperty response: descriptor=$descriptor length=${result.length}")
+           }
     } yield result
+
+  private def scheduleExtractPropertyTimeout(
+    descriptor: String
+  ): F[Option[Scheduler.JobHandler[F, Unit]]] = {
+    val timeout = Frontend.extractPropertyTimeout
+    if (timeout.toMillis <= 0) {
+      Effect[F].pure(None)
+    } else {
+      scheduler
+        .scheduleOnce(timeout) {
+          stringPromises.putEither(
+            descriptor,
+            Left(ClientSideException(s"ExtractProperty timed out for $descriptor")),
+            silent = true
+          )
+        }
+        .map(Some(_))
+    }
+  }
 
   def setProperty(id: Id, name: String, value: Any): F[Unit] =
     send(Procedure.ModifyDom.code, ModifyDomProcedure.SetAttr.code, id.mkString, 0, name, value, true)
@@ -178,9 +216,38 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
   def extractEventData(dem: DomEventMessage): F[String] =
     for {
       descriptor <- nextDescriptor()
-      _          <- send(Procedure.ExtractEventData.code, descriptor, dem.target.mkString, dem.eventType)
-      result     <- stringPromises.get(descriptor)
+      _ <- Effect[F].delay {
+             reporter.debug(
+               s"ExtractEventData request: id=${dem.target.mkString} type=${dem.eventType} descriptor=$descriptor"
+             )
+           }
+      _       <- send(Procedure.ExtractEventData.code, descriptor, dem.target.mkString, dem.eventType)
+      timeout <- scheduleExtractEventDataTimeout(descriptor)
+      result  <- getStringPromise(descriptor)
+      _       <- timeout.fold(Effect[F].unit)(_.cancel())
+      _ <- Effect[F].delay {
+             reporter.debug(s"ExtractEventData response: descriptor=$descriptor length=${result.length}")
+           }
     } yield result
+
+  private def scheduleExtractEventDataTimeout(
+    descriptor: String
+  ): F[Option[Scheduler.JobHandler[F, Unit]]] = {
+    val timeout = Frontend.extractEventDataTimeout
+    if (timeout.toMillis <= 0) {
+      Effect[F].pure(None)
+    } else {
+      scheduler
+        .scheduleOnce(timeout) {
+          stringPromises.putEither(
+            descriptor,
+            Left(ClientSideException(s"ExtractEventData timed out for $descriptor")),
+            silent = true
+          )
+        }
+        .map(Some(_))
+    }
+  }
 
   def performDomChanges(f: ChangesPerformer => Unit): F[Unit] = {
     def diff = {
@@ -264,11 +331,14 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
     val tokens = json
       .substring(1, json.length - 1) // remove brackets
       .split(",", 2)                 // split to tokens
-    val callbackType = tokens(0)
+    val callbackType = tokens(0).toInt
     val args =
       if (tokens.length > 1) unescapeJsonString(tokens(1))
       else ""
-    (callbackType.toInt, args)
+    if (callbackType == CallbackType.DomEvent.code) {
+      reporter.debug(s"DOM event received: $args")
+    }
+    (callbackType, args)
   }
 
   rawClientMessages.foreach {
@@ -281,20 +351,23 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
       }
     case (CallbackType.ExtractPropertyResponse.code, args) =>
       val Array(descriptor, propertyType, value) = args.split(":", 3)
+      reporter.debug(
+        s"ExtractPropertyResponse received: descriptor=$descriptor type=$propertyType length=${value.length}"
+      )
       propertyType.toInt match {
         case PropertyType.Error.code =>
           stringPromises
-            .fail(descriptor, ClientSideException(value))
+            .putEither(descriptor, Left(ClientSideException(value)), silent = true)
             .after(stringPromises.remove(descriptor))
         case _ =>
           stringPromises
-            .put(descriptor, value)
+            .putEither(descriptor, Right(value), silent = true)
             .after(stringPromises.remove(descriptor))
       }
     case (CallbackType.ExtractEventDataResponse.code, args) =>
       val Array(descriptor, value) = args.split(":", 2)
       stringPromises
-        .put(descriptor, value)
+        .putEither(descriptor, Right(value), silent = true)
         .after(stringPromises.remove(descriptor))
     case (CallbackType.EvalJsResponse.code, args) =>
       val Array(descriptor, status, json) = args.split(":", 3)
@@ -320,6 +393,21 @@ final class Frontend[F[_]: Effect](incomingMessages: Stream[F, String], heartbea
 }
 
 object Frontend {
+
+  private val DefaultExtractPropertyTimeout = 5.seconds
+  private val DefaultExtractEventDataTimeout = 5.seconds
+
+  private def extractPropertyTimeout: FiniteDuration =
+    Option(System.getProperty("korolev.extractPropertyTimeoutMillis"))
+      .flatMap(_.toLongOption)
+      .map(_.millis)
+      .getOrElse(DefaultExtractPropertyTimeout)
+
+  private def extractEventDataTimeout: FiniteDuration =
+    Option(System.getProperty("korolev.extractEventDataTimeoutMillis"))
+      .flatMap(_.toLongOption)
+      .map(_.millis)
+      .getOrElse(DefaultExtractEventDataTimeout)
 
   final case class DomEventMessage(eventCounter: Int, target: Id, eventType: String)
 

@@ -106,17 +106,16 @@ final class WebSocketProtocol[B: BytesLike] {
     incoming: Frame[B]
   ): (Option[Frame.Merged[B]], Decoder.Action[Frame[B], Frame.Merged[B]]) =
     (buffer, incoming) match {
-      case (_, controlFrame: Frame.Control[B]) =>
-        // Control frames MAY be injected in
-        // the middle of a fragmented message.
+      case (_, controlFrame: Frame.Control[B] @unchecked) =>
+        // Control frames MAY be injected in the middle of a fragmented message.
         (buffer, Decoder.Action.Push(controlFrame))
-      case (None, i: Frame.Merged[B]) if i.fin       => (None, Decoder.Action.Push(i))
-      case (None, i: Frame.Text[B]) if !i.fin        => (Some(i), Decoder.Action.TakeNext)
-      case (None, i: Frame.Binary[B]) if !i.fin      => (Some(i), Decoder.Action.TakeNext)
-      case (None, i: Frame.Unspecified[B]) if !i.fin => (Some(i), Decoder.Action.TakeNext)
-      case (Some(buffer), i: Frame.Continuation[B]) if !i.fin =>
+      case (None, i: Frame.Merged[B] @unchecked) if i.fin       => (None, Decoder.Action.Push(i))
+      case (None, i: Frame.Text[B] @unchecked) if !i.fin        => (Some(i), Decoder.Action.TakeNext)
+      case (None, i: Frame.Binary[B] @unchecked) if !i.fin      => (Some(i), Decoder.Action.TakeNext)
+      case (None, i: Frame.Unspecified[B] @unchecked) if !i.fin => (Some(i), Decoder.Action.TakeNext)
+      case (Some(buffer), i: Frame.Continuation[B] @unchecked) if !i.fin =>
         (Some(buffer.append(i.payload, fin = false)), Decoder.Action.TakeNext)
-      case (Some(buffer), i: Frame.Continuation[B]) if i.fin =>
+      case (Some(buffer), i: Frame.Continuation[B] @unchecked) if i.fin =>
         (None, Decoder.Action.Push(buffer.append(i.payload, fin = true)))
       case _ =>
         throw new IllegalStateException(s"Fragmentation in WebSocket is invalid. Received $incoming after $buffer")

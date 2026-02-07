@@ -165,8 +165,8 @@ sealed trait Path extends PathAndQuery {
     @tailrec
     def reverse(path: Path, result: Path): Path =
       path match {
-        case prev / value =>
-          reverse(prev, result / value)
+        case p: PathAndQuery./ =>
+          reverse(p.prev, result / p.value)
         case Root =>
           result
       }
@@ -178,8 +178,8 @@ sealed trait Path extends PathAndQuery {
     @tailrec
     def aux(result: Path, other: Path): Path =
       other match {
-        case prev / value =>
-          aux(result / value, prev)
+        case p: PathAndQuery./ =>
+          aux(result / p.value, p.prev)
         case Root =>
           result
       }
@@ -295,10 +295,12 @@ object PathAndQuery {
       case Some(query) =>
         query
           .split('&')
+          .iterator
           .map { xs =>
             val parts: Array[String] = xs.split('=')
             (decode(parts.head), parts.lift(1).map(decode).getOrElse(""))
           }
+          .toList
     }
 
   private[web] def parsePath(raw: String): Path =

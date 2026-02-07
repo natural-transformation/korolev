@@ -39,15 +39,26 @@ private[korolev] final class FilesService[F[_]: Effect](commonService: CommonSer
         val fsPath              = path.mkString
         val maybeResourceStream = Option(this.getClass.getResourceAsStream(fsPath))
         maybeResourceStream.fold(notFoundToken) { javaSyncStream =>
-          val _ / fileName = path
+          val fileName = path match {
+            case p: PathAndQuery./ => p.value
+            case Root              => ""
+          }
           val fileExtension = fileName.lastIndexOf('.') match {
             case -1    => "bin" // default file extension
             case index => fileName.substring(index + 1)
           }
-          val headers = MimeTypes.typeForExtension.get(fileExtension) match {
+          val contentTypeHeader = MimeTypes.typeForExtension.get(fileExtension) match {
             case Some(mimeType) => Seq(Headers.ContentType -> mimeType)
             case None           => Nil
           }
+          // Avoid stale Korolev client JS after local publish or upgrades.
+          val cacheHeaders =
+            if (fileName.startsWith("korolev-client")) {
+              Seq(Headers.CacheControlNoCache, Headers.PragmaNoCache)
+            } else {
+              Nil
+            }
+          val headers = contentTypeHeader ++ cacheHeaders
           val size = javaSyncStream.available().toLong
           for {
             stream <- JavaIO.fromInputStream[F, Bytes](javaSyncStream) // TODO configure chunk size

@@ -36,11 +36,29 @@ sealed trait PseudoHtml {
   def byAttribute(name: String, f: String => Boolean): List[Element] =
     findElement(_.attributes.get(name).exists(f))
 
+  def byAttrEquals(name: String, value: String): List[Element] =
+    byAttribute(name, _ == value)
+
   def byClass(clazz: String): List[Element] =
     byAttribute("class", _.indexOf(clazz) > -1)
 
   def byName(name: String): List[Element] =
     byAttribute("name", _ == name)
+
+  def firstByTag(tagName: String): Option[Element] = {
+    def loop(node: PseudoHtml): Option[Element] = node match {
+      case element: Element if element.tagName == tagName =>
+        Some(element)
+      case element: Element =>
+        element.children.foldLeft(Option.empty[Element]) {
+          case (found @ Some(_), _) => found
+          case (None, child)        => loop(child)
+        }
+      case _: Text =>
+        None
+    }
+    loop(this)
+  }
 
   def byTag(tagName: String): List[PseudoHtml] =
     findElement(_.tagName == tagName)
@@ -108,9 +126,18 @@ object PseudoHtml {
 
     def closeNode(name: String): Unit = {
       idBuilder.decLevel()
-      val (xmlns, _) :: currentNodeTail   = currentNode
-      val children :: currentChildrenTail = currentChildren
-      val c2 :: cct2                      = currentChildrenTail
+      val (xmlns, currentNodeTail) = currentNode match {
+        case (ns, _) :: tail => (ns, tail)
+        case Nil             => throw new IllegalStateException("No open node to close")
+      }
+      val (children, currentChildrenTail) = currentChildren match {
+        case head :: tail => (head, tail)
+        case Nil          => throw new IllegalStateException("Missing children stack")
+      }
+      val (c2, cct2) = currentChildrenTail match {
+        case head :: tail => (head, tail)
+        case Nil          => throw new IllegalStateException("Missing parent children stack")
+      }
       val node = PseudoHtml.Element(
         id = idBuilder.mkId,
         ns = xmlns,
@@ -131,9 +158,13 @@ object PseudoHtml {
 
     def addTextNode(text: String): Unit = {
       idBuilder.incId()
-      val children :: xs  = currentChildren
-      val updatedChildren = PseudoHtml.Text(idBuilder.mkId, text) :: children
-      currentChildren = updatedChildren :: xs
+      currentChildren match {
+        case children :: xs =>
+          val updatedChildren = PseudoHtml.Text(idBuilder.mkId, text) :: children
+          currentChildren = updatedChildren :: xs
+        case Nil =>
+          throw new IllegalStateException("Missing current node for text")
+      }
     }
 
     def addMisc(misc: Binding[F, S, M]): Unit = {
@@ -147,9 +178,11 @@ object PseudoHtml {
           }
         case elementId: ElementId =>
           elements = (idBuilder.mkId, elementId) :: elements
-        case event: Context.Event[F, S, M] =>
+        case event: Context.Event[_, _, _] =>
           val eventId = EventId(idBuilder.mkId, event.`type`, event.phase)
-          events = (eventId, event) :: events
+          events = (eventId, event.asInstanceOf[Context.Event[F, S, M]]) :: events
+        case _: Context.Delay[_, _, _] =>
+          ()
       }
       idBuilder.incLevel()
     }
@@ -165,7 +198,10 @@ object PseudoHtml {
 
     val rc = new PseudoDomRenderContext[F, S, M]()
     node(rc)
-    val (top :: _) :: _ = rc.currentChildren
+    val top = rc.currentChildren match {
+      case (value :: _) :: _ => value
+      case _                 => throw new IllegalStateException("Rendered pseudo DOM is empty")
+    }
     RenderingResult(top, rc.elements.toMap, rc.events.toMap)
   }
 

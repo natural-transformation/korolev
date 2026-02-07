@@ -9,7 +9,8 @@ import zio.test.TestAspect.{identity as _, _}
 
 object Zio2QueueSpec extends ZIOSpecDefault {
   implicit val effect: Zio2Effect[Any, Throwable] = new Zio2Effect[Any, Throwable](runtime, identity, identity)
-  def spec = suite("Queue Spec")(
+  override def spec: Spec[Environment with TestEnvironment with Scope, Any] =
+    suite("Queue Spec")(
     test("sequential offer and take") {
       for {
         _    <- ZIO.unit
@@ -170,7 +171,7 @@ object Zio2QueueSpec extends ZIOSpecDefault {
         } yield ()
       }(isUnit)
     )
-  )
+    )
 }
 
 object QueueSpecUtil {

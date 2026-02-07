@@ -118,3 +118,63 @@ flowchart TD
   Saved --> Streams["start dom/history/state streams"]
   Pre --> Streams
 ```
+
+## Testing With `korolev-testkit`
+
+Korolev includes a renderer-level testkit (`modules/testkit`) for testing UI behavior without running a real browser session.
+
+Key pieces:
+- `PseudoHtml.render(dom)` renders a Levsha node to pseudo DOM and keeps:
+  - DOM id to `ElementId` mapping
+  - event handlers
+- `Browser.event(...)` simulates event propagation and returns captured actions (`Publish`, `Transition`, `PropertySet`, and so on).
+
+### New selector helpers
+
+`PseudoHtml` now provides:
+- `byAttrEquals(name, value)` for exact attribute matching
+- `firstByTag(tagName)` for first-match tag lookup
+
+```scala
+val pd = PseudoHtml.render(dom).pseudoDom
+
+val submitButtonId = pd.byAttrEquals("name", "submit").headOption.map(_.id)
+val firstDivId = pd.firstByTag("div").map(_.id)
+```
+
+### Targeting by `ElementId`
+
+When a renderer uses explicit `elementId(...)`, tests can now target that Korolev id directly:
+
+```scala
+val clickTarget = elementId(Some("click-target"))
+
+val actionsF =
+  Browser().eventByElementId(
+    state = initialState,
+    dom = dom,
+    event = "click",
+    targetElementId = clickTarget
+  )
+```
+
+### Advanced targeting with element map
+
+For full control, use the overload that exposes the Levsha-to-`ElementId` map:
+
+```scala
+Browser().event(
+  state = initialState,
+  dom = dom,
+  event = "click",
+  target = (_, elementMap) =>
+    elementMap.collectFirst { case (domId, eid) if eid == clickTarget => domId },
+  eventData = ""
+)
+```
+
+### Run testkit tests
+
+```bash
+nix develop --command sbt test
+```

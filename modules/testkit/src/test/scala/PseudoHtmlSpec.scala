@@ -6,7 +6,6 @@ import org.scalatest.matchers.should.Matchers
 class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
 
   "PseudoDom.render" should "map levsha.Node to PseudoDom.Element" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div()
@@ -47,7 +46,6 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "map attributes well" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div(clazz := "foo bar", id := "baz")
@@ -64,7 +62,6 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
   }
 
   it should "map styles well" in {
-    import levsha.dsl._
     import levsha.dsl.html._
 
     val node = div(backgroundColor @= "red", border @= "1px")
@@ -95,5 +92,38 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
 
     val pd = PseudoHtml.render(dom).pseudoDom
     pd.byName("my-button").headOption.map(_.id) shouldEqual Some(Id("1_2"))
+  }
+
+  "byAttrEquals" should "find list of Element by exact attribute value" in {
+
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    val dom = body(
+      button(name := "alpha", "A"),
+      button(name := "beta", "B")
+    )
+
+    val pd = PseudoHtml.render(dom).pseudoDom
+
+    pd.byAttrEquals("name", "beta").headOption.map(_.id) shouldEqual Some(Id("1_2"))
+  }
+
+  "firstByTag" should "return the first matching element by tag" in {
+
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    val dom = body(
+      div("One"),
+      div("Two"),
+      button("Click")
+    )
+
+    val pd = PseudoHtml.render(dom).pseudoDom
+
+    pd.firstByTag("div").map(_.id) shouldEqual Some(Id("1_1"))
+    pd.firstByTag("button").map(_.id) shouldEqual Some(Id("1_3"))
+    pd.firstByTag("section") shouldEqual None
   }
 }

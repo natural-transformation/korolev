@@ -4,15 +4,16 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 import java.util.NoSuchElementException
 import korolev.{Context, Qsid, Transition, TransitionAsync}
-import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId, MappedAccess}
+import korolev.Context.{Access, BaseAccessDefault, Binding, ElementId}
 import korolev.data.Bytes
 import korolev.effect.Effect
 import korolev.effect.Stream
 import korolev.effect.syntax.*
 import korolev.internal.Frontend.ClientSideException
-import korolev.util.{JsCode, Lens}
+import korolev.util.JsCode
 import korolev.web.FormData
 import org.graalvm.polyglot.HostAccess
+import scala.collection.immutable.Seq
 import scala.collection.mutable
 
 case class Browser(
@@ -83,27 +84,136 @@ case class Browser(
     eventData: String = ""
   ): F[Seq[Action[F, S, M]]] = {
 
-    val rr = PseudoHtml.render(dom)
-    target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { target =>
-      val propagation = levsha.events.calculateEventPropagation(target, event)
+    this.event[F, S, M](
+      state = state,
+      dom = dom,
+      event = event,
+      target = (pseudoHtml: PseudoHtml, _: Map[levsha.Id, ElementId]) => target(pseudoHtml),
+      eventData = eventData
+    )
 
-      // (continue propagation, list of batches of actions)
-      val (_, actions) = propagation.foldLeft((true, List.empty[F[Seq[Action[F, S, M]]]])) {
-        case (continue @ (false, _), _) => continue
-        case (continue @ (true, acc), eventId) =>
-          rr.events.get(eventId) match {
-            case None => continue
-            case Some(event) =>
-              val actionsF = access(state, event.effect, eventData, rr.elements)
-              (!event.stopPropagation, actionsF :: acc)
-          }
-      }
+  }
+
+  /**
+   * Simulate event propagation on the given DOM with access to the rendered
+   * Levsha-to-ElementId mapping.
+   */
+  def event[F[_]: Effect, S, M](
+    state: S,
+    dom: levsha.Document.Node[Binding[F, S, M]],
+    event: String,
+    target: (PseudoHtml, Map[levsha.Id, ElementId]) => Option[levsha.Id],
+    eventData: String
+  ): F[Seq[Action[F, S, M]]] = {
+
+    val rr = PseudoHtml.render(dom)
+
+    def collectActions(targetId: levsha.Id, eventType: String): F[Seq[Action[F, S, M]]] = {
+      val propagation = levsha.events.calculateEventPropagation(targetId, eventType)
 
       Effect[F]
-        .sequence(actions)
+        .sequence {
+          // (continue propagation, list of batches of actions)
+          val (_, actions) = propagation.foldLeft((true, List.empty[F[Seq[Action[F, S, M]]]])) {
+            case (continue @ (false, _), _) => continue
+            case (continue @ (true, acc), eventId) =>
+              rr.events.get(eventId) match {
+                case None => continue
+                case Some(event) =>
+                  val actionsF = access(state, event.effect, eventData, rr.elements)
+                  (!event.stopPropagation, actionsF :: acc)
+              }
+          }
+          actions
+        }
         .map(_.flatten)
     }
+
+    def findElementPath(
+      node: PseudoHtml,
+      targetId: levsha.Id
+    ): Option[(PseudoHtml.Element, List[PseudoHtml.Element])] = {
+      def loop(
+        current: PseudoHtml,
+        parents: List[PseudoHtml.Element]
+      ): Option[(PseudoHtml.Element, List[PseudoHtml.Element])] = current match {
+        case element: PseudoHtml.Element =>
+          if (element.id == targetId) {
+            Some((element, parents))
+          } else {
+            element.children.foldLeft(Option.empty[(PseudoHtml.Element, List[PseudoHtml.Element])]) {
+              case (found @ Some(_), _) => found
+              case (None, child)        => loop(child, element :: parents)
+            }
+          }
+        case _ =>
+          None
+      }
+      loop(node, Nil)
+    }
+
+    def isSubmitButton(element: PseudoHtml.Element): Boolean = {
+      val tagName = element.tagName.toLowerCase
+      tagName match {
+        case "button" =>
+          element.attributes
+            .get("type")
+            .forall(t => t.toLowerCase != "button" && t.toLowerCase != "reset")
+        case "input" =>
+          element.attributes
+            .get("type")
+            .exists(_.toLowerCase == "submit")
+        case _ =>
+          false
+      }
+    }
+
+    def findSubmitForm(targetId: levsha.Id): Option[levsha.Id] =
+      findElementPath(rr.pseudoDom, targetId).flatMap { case (targetElement, parents) =>
+        if (isSubmitButton(targetElement)) {
+          parents.find(_.tagName == "form").map(_.id)
+        } else {
+          None
+        }
+      }
+
+    target(rr.pseudoDom, rr.elements).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { targetId =>
+      val clickActionsF = collectActions(targetId, event)
+      if (event != "click") {
+        clickActionsF
+      } else {
+        findSubmitForm(targetId) match {
+          case None => clickActionsF
+          case Some(formId) =>
+            clickActionsF.flatMap { clickActions =>
+              // Emulate browser default: submit forms on submit button click.
+              collectActions(formId, "submit").map(clickActions ++ _)
+            }
+        }
+      }
+    }
   }
+
+  /**
+   * Simulate event propagation targeting a Korolev ElementId directly.
+   */
+  def eventByElementId[F[_]: Effect, S, M](
+    state: S,
+    dom: levsha.Document.Node[Binding[F, S, M]],
+    event: String,
+    targetElementId: ElementId,
+    eventData: String = ""
+  ): F[Seq[Action[F, S, M]]] =
+    this.event[F, S, M](
+      state = state,
+      dom = dom,
+      event = event,
+      target = (_: PseudoHtml, elementMap: Map[levsha.Id, ElementId]) =>
+        elementMap.collectFirst {
+          case (domId, elementId) if elementId == targetElementId => domId
+        },
+      eventData = eventData
+    )
 
   /**
    * Applies `f` to the Browser using [[Context.Access]].
@@ -172,7 +282,7 @@ case class Browser(
       def downloadFiles(id: ElementId): F[List[(Context.FileHandler, Bytes)]] =
         Effect[F].delay {
           browser.filesMap(id).toList map { case (name, bytes) =>
-            Context.FileHandler(name, bytes.length)(id) -> Bytes.wrap(bytes)
+            Context.FileHandler(name, bytes.length.toLong)(id) -> Bytes.wrap(bytes)
           }
         }
 
@@ -180,7 +290,7 @@ case class Browser(
         Effect[F].sequence {
           browser.filesMap(id).toList map { case (name, ba) =>
             val bytes = Bytes.wrap(ba)
-            val h     = Context.FileHandler(name, ba.length)(id)
+            val h     = Context.FileHandler(name, ba.length.toLong)(id)
             Stream(bytes).mat().map { s =>
               (h, s)
             }
@@ -205,7 +315,7 @@ case class Browser(
       def listFiles(id: ElementId): F[List[Context.FileHandler]] =
         Effect[F].delay {
           browser.filesMap(id).toList map { case (name, bytes) =>
-            Context.FileHandler(name, bytes.length)(id)
+            Context.FileHandler(name, bytes.length.toLong)(id)
           }
         }
 
@@ -228,15 +338,16 @@ case class Browser(
           bindings.putMember("code", finalCode)
           bindings.putMember("handler", handler)
 
+          // Preserve JS template literals by escaping Scala interpolation.
           context.eval(
             "js",
-            jsMocks.mkString("\n") + """
+            jsMocks.mkString("\n") + s"""
               var result;
               var status = 0;
               try {
                 result = eval(code);
               } catch (e) {
-                console.error(`Error evaluating code ${code}`, e);
+                console.error(`Error evaluating code $${code}`, e);
                 result = e;
                 status = 1;
               }
@@ -245,7 +356,7 @@ case class Browser(
                 result.then(
                   (res) => handler.result(JSON.stringify(res)),
                   (err) => {
-                    console.error(`Error evaluating code ${code}`, err);
+                    console.error(`Error evaluating code $${code}`, err);
                     handler.error(err.toString())
                   }
                 );

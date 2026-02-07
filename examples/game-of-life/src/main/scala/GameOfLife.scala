@@ -118,7 +118,7 @@ case class Universe(cells: Vector[Universe.Cell], size: Int) {
     def aliveNeighbors(px: Int, py: Int): Int = {
       @tailrec def aux(num: Int = 0, x: Int = px + 1, y: Int = py + 1): Int =
         if (y < py - 1) num
-        else if (x < px - 1) aux(num, y = y - 1)
+        else if (x < px - 1) aux(num, x = px + 1, y = y - 1)
         else if (x == px && y == py) aux(num, x - 1, y)
         else if (apply(x, y).alive) aux(num + 1, x - 1, y)
         else aux(num, x - 1, y)
