@@ -84,6 +84,28 @@ case class Browser(
     eventData: String = ""
   ): F[Seq[Action[F, S, M]]] = {
 
+    this.event[F, S, M](
+      state = state,
+      dom = dom,
+      event = event,
+      target = (pseudoHtml: PseudoHtml, _: Map[levsha.Id, ElementId]) => target(pseudoHtml),
+      eventData = eventData
+    )
+
+  }
+
+  /**
+   * Simulate event propagation on the given DOM with access to the rendered
+   * Levsha-to-ElementId mapping.
+   */
+  def event[F[_]: Effect, S, M](
+    state: S,
+    dom: levsha.Document.Node[Binding[F, S, M]],
+    event: String,
+    target: (PseudoHtml, Map[levsha.Id, ElementId]) => Option[levsha.Id],
+    eventData: String
+  ): F[Seq[Action[F, S, M]]] = {
+
     val rr = PseudoHtml.render(dom)
 
     def collectActions(targetId: levsha.Id, eventType: String): F[Seq[Action[F, S, M]]] = {
@@ -155,7 +177,7 @@ case class Browser(
         }
       }
 
-    target(rr.pseudoDom).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { targetId =>
+    target(rr.pseudoDom, rr.elements).fold(Effect[F].pure(Seq.empty[Action[F, S, M]])) { targetId =>
       val clickActionsF = collectActions(targetId, event)
       if (event != "click") {
         clickActionsF
@@ -171,6 +193,26 @@ case class Browser(
       }
     }
   }
+
+  /**
+   * Simulate event propagation targeting a Korolev ElementId directly.
+   */
+  def eventByElementId[F[_]: Effect, S, M](
+    state: S,
+    dom: levsha.Document.Node[Binding[F, S, M]],
+    event: String,
+    targetElementId: ElementId,
+    eventData: String = ""
+  ): F[Seq[Action[F, S, M]]] =
+    this.event[F, S, M](
+      state = state,
+      dom = dom,
+      event = event,
+      target = (_, elementMap) => elementMap.collectFirst {
+        case (domId, elementId) if elementId == targetElementId => domId
+      },
+      eventData = eventData
+    )
 
   /**
    * Applies `f` to the Browser using [[Context.Access]].

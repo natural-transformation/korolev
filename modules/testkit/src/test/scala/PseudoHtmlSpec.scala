@@ -93,4 +93,37 @@ class PseudoHtmlSpec extends AnyFlatSpec with Matchers {
     val pd = PseudoHtml.render(dom).pseudoDom
     pd.byName("my-button").headOption.map(_.id) shouldEqual Some(Id("1_2"))
   }
+
+  "byAttrEquals" should "find list of Element by exact attribute value" in {
+
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    val dom = body(
+      button(name := "alpha", "A"),
+      button(name := "beta", "B")
+    )
+
+    val pd = PseudoHtml.render(dom).pseudoDom
+
+    pd.byAttrEquals("name", "beta").headOption.map(_.id) shouldEqual Some(Id("1_2"))
+  }
+
+  "firstByTag" should "return the first matching element by tag" in {
+
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    val dom = body(
+      div("One"),
+      div("Two"),
+      button("Click")
+    )
+
+    val pd = PseudoHtml.render(dom).pseudoDom
+
+    pd.firstByTag("div").map(_.id) shouldEqual Some(Id("1_1"))
+    pd.firstByTag("button").map(_.id) shouldEqual Some(Id("1_3"))
+    pd.firstByTag("section") shouldEqual None
+  }
 }

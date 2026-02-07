@@ -141,4 +141,35 @@ class BrowserSpec extends AsyncFlatSpec with Matchers {
         actions shouldEqual List(Action.Publish("submitted"))
       }
   }
+
+  it should "emulate event propagation when targeting by ElementId" in {
+
+    val context = Context[Future, String, Any]
+
+    import context._
+    import levsha.dsl._
+    import levsha.dsl.html._
+
+    val clickTarget = elementId(Some("click-target"))
+
+    def onClick(access: Access) =
+      access.publish("clicked")
+
+    val dom = body(
+      button(
+        clickTarget,
+        event("click")(onClick),
+        "Click me"
+      )
+    )
+
+    Browser()
+      .eventByElementId(
+        state = "",
+        dom = dom,
+        event = "click",
+        targetElementId = clickTarget
+      )
+      .map(actions => actions shouldEqual List(Action.Publish("clicked")))
+  }
 }

@@ -36,11 +36,29 @@ sealed trait PseudoHtml {
   def byAttribute(name: String, f: String => Boolean): List[Element] =
     findElement(_.attributes.get(name).exists(f))
 
+  def byAttrEquals(name: String, value: String): List[Element] =
+    byAttribute(name, _ == value)
+
   def byClass(clazz: String): List[Element] =
     byAttribute("class", _.indexOf(clazz) > -1)
 
   def byName(name: String): List[Element] =
     byAttribute("name", _ == name)
+
+  def firstByTag(tagName: String): Option[Element] = {
+    def loop(node: PseudoHtml): Option[Element] = node match {
+      case element: Element if element.tagName == tagName =>
+        Some(element)
+      case element: Element =>
+        element.children.foldLeft(Option.empty[Element]) {
+          case (found @ Some(_), _) => found
+          case (None, child)        => loop(child)
+        }
+      case _: Text =>
+        None
+    }
+    loop(this)
+  }
 
   def byTag(tagName: String): List[PseudoHtml] =
     findElement(_.tagName == tagName)
