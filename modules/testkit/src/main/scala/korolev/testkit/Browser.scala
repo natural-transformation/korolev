@@ -208,9 +208,10 @@ case class Browser(
       state = state,
       dom = dom,
       event = event,
-      target = (_, elementMap) => elementMap.collectFirst {
-        case (domId, elementId) if elementId == targetElementId => domId
-      },
+      target = (_: PseudoHtml, elementMap: Map[levsha.Id, ElementId]) =>
+        elementMap.collectFirst {
+          case (domId, elementId) if elementId == targetElementId => domId
+        },
       eventData = eventData
     )
 
